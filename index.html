@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="vendor/leaflet.css">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="style.css?v=yard-sale-1">
-  <link rel="stylesheet" href="yard-sale.css?v=photo-moderation-4">
+  <link rel="stylesheet" href="yard-sale.css?v=payments-moderation-5">
 </head>
 <body>
   <main>
@@ -110,6 +110,7 @@
       <div class="two-col"><label>Start time (Central)<input name="starts" type="time" required></label><label>End time (Central)<input name="ends" type="time" required></label></div><label>Good to know
         <textarea name="notes" maxlength="400" rows="2" placeholder="Describe your items, sizes, payment options, or anything shoppers should know."></textarea>
       </label>
+      <div id="payment-fields"></div>
       <label class="photo-picker-label">Photos <span class="optional-label">optional · up to 5</span><input id="sale-photos" type="file" accept="image/*" multiple aria-describedby="photo-status"></label>
       <p id="photo-status" class="field-help" role="status"></p><div id="photo-previews" class="photo-preview-grid"></div>
       <p class="fine-print">Your home listing appears immediately. Photos stay private until the organizer approves them.</p>
@@ -183,8 +184,8 @@
   <script src="vendor/maplibre-gl.js"></script>
   <script src="vendor/leaflet-maplibre-gl.js"></script>
   <script src="vendor/supabase.js"></script>
-  <script src="config.js?v=photo-moderation-4"></script>
-  <script src="app.js?v=photo-moderation-4" type="module"></script>
+  <script src="config.js?v=payments-moderation-5"></script>
+  <script src="app.js?v=payments-moderation-5" type="module"></script>
 
 </body>
 </html>

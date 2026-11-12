@@ -10,6 +10,15 @@ const config = window.YARD_SALE_CONFIG;
 const demo = new URLSearchParams(location.search).get('demo') === '1';
 const categories = {"mens":{"label":"Men's Clothes","icon":"👔","color":"#856b53"},"womens":{"label":"Women's Clothes","icon":"👗","color":"#ac7181"},"kids":{"label":"Kids' Clothes","icon":"👕","color":"#c49344"},"toys":{"label":"Toys","icon":"🧸","color":"#cc913d"},"electronics":{"label":"Electronics","icon":"🔌","color":"#587b85"},"household":{"label":"Home Goods","icon":"🏠","color":"#788558"},"furniture":{"label":"Furniture","icon":"🪑","color":"#a86441"},"tools":{"label":"Tools & Outdoors","icon":"🛠️","color":"#65775f"},"books":{"label":"Books & Games","icon":"📚","color":"#8b729b"},"other":{"label":"Other","icon":"🏷️","color":"#a57d47"}};
 const displayCategories = {...categories, mixed:{label:'Variety sale',icon:'🛍️',color:'#377e68'}};
+const paymentMethods={cash:'Cash',venmo:'Venmo',zelle:'Zelle',cashapp:'Cash App',paypal:'PayPal',card:'Cards',other:'Other'};
+function paymentDescription(stop){return (stop.payment_methods||[]).map(key=>key==='other'&&stop.payment_other?stop.payment_other:paymentMethods[key]).filter(Boolean).join(' · ');}
+function paymentFields(stop={}){
+  return `<fieldset><legend>Accepted payments <span class="optional-label">optional</span></legend><div class="category-options">${Object.entries(paymentMethods).map(([key,label])=>`<label><input name="payment_methods" type="checkbox" value="${key}" ${(stop.payment_methods||[]).includes(key)?'checked':''}><span>${label}</span></label>`).join('')}</div></fieldset><label class="payment-other-field">Other payment method<input name="payment_other" maxlength="80" value="${escapeHtml(stop.payment_other||'')}" placeholder="Name another accepted payment method"></label>`;
+}
+function setupPaymentFields(form){
+  const checkbox=form.querySelector('[name="payment_methods"][value="other"]'),field=form.querySelector('.payment-other-field');
+  const sync=()=>{field.hidden=!checkbox.checked;field.querySelector('input').disabled=!checkbox.checked;};checkbox.onchange=sync;sync();
+}
 const saleHours = stop => {
  const fmt = v => { const [h,m] = String(v || '00:00').split(':').map(Number); return (h % 12 || 12) + (m ? ':' + String(m).padStart(2,'0') : '') + (h >= 12 ? ' PM' : ' AM'); };
  return fmt(stop.starts) + ' – ' + fmt(stop.ends) + ' CT';
@@ -983,7 +992,7 @@ function render() {
   $('#stop-list').innerHTML = visible.length ? visible.map((stop) => {
     const category = displayCategory(stop);
     const categoryInfo = displayCategories[category];
-    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.title)}</span><span class="stop-address">${escapeHtml(stop.address)}</span><span class="stop-time">${escapeHtml(saleHours(stop))}</span><span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span></span></button>`;
+    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.title)}</span><span class="stop-address">${escapeHtml(stop.address)}</span><span class="stop-time">${escapeHtml(saleHours(stop))}</span><span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span>${paymentDescription(stop)?`<span class="stop-payments">${escapeHtml(paymentDescription(stop))}</span>`:''}</span></button>`;
   }).join('') : `<div class="empty"><span class="empty-icon">🏷️</span><strong>${stops.length ? 'No matching stops' : 'Be the first on the block'}</strong>${stops.length ? 'Try another filter or search.' : 'Add your house to the neighborhood Yard Sale map.'}</div>`;
   $('#stop-list').querySelectorAll('[data-stop]').forEach((button) => { button.onclick = () => showDetail(button.dataset.stop); });
   if (selectedId && !visible.some((stop) => stop.id === selectedId)) closeDetail();
@@ -1007,11 +1016,11 @@ function showDetail(id, pan = true) {
     <fieldset><legend>What’s here?</legend><div class="category-options">
       ${Object.entries(categories).map(([key, item]) => `<label><input name="categories" type="checkbox" value="${key}" ${stop.categories.includes(key) ? 'checked' : ''}><span>${item.icon} ${item.label}</span></label>`).join('')}
     </div></fieldset>
-    <label>Good to know<textarea name="notes" maxlength="400" rows="2">${escapeHtml(stop.notes || '')}</textarea></label>
+    <label>Good to know<textarea name="notes" maxlength="400" rows="2">${escapeHtml(stop.notes || '')}</textarea></label>${paymentFields(stop)}
     <div class="two-col"><label>Starts<input name="starts" type="time" value="${escapeHtml(stop.starts?.slice(0,5))}" required></label><label>Ends<input name="ends" type="time" value="${escapeHtml(stop.ends?.slice(0,5))}" required></label></div><p class="error organizer-edit-error" role="alert"></p>
     <div class="organizer-actions"><button class="primary" type="submit">Save changes</button><button class="danger" id="organizer-remove" type="button">Remove from map</button></div>
   </form>` : '';
-  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
+  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${paymentDescription(stop)?`<p class="sale-payments"><strong>Accepted payments:</strong> ${escapeHtml(paymentDescription(stop))}</p>`:''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
   $('#detail').hidden = false;
   if(!demo){
     renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db),isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
@@ -1029,6 +1038,7 @@ function showDetail(id, pan = true) {
   $('.close-detail').onclick = () => { closeDetail(); render(); };
   $('#directions-stop').onclick = () => openDirections(stop);
   $('#share-stop').onclick = () => share(id);
+  if($('#organizer-edit'))setupPaymentFields($('#organizer-edit'));
   if ($('#organizer-edit')) $('#organizer-edit').onsubmit = async (event) => {
     event.preventDefault();
     const editForm = new FormData(event.target);
@@ -1037,7 +1047,7 @@ function showDetail(id, pan = true) {
     if (!selectedCategories.length) { errorElement.textContent = 'Choose at least one offering, or remove the home from the map.'; return; }
     const saveButton = event.target.querySelector('[type="submit"]');
     saveButton.disabled = true;
-    const updates = { starts: editForm.get('starts'), ends: editForm.get('ends'), title: editForm.get('title').trim(), notes: editForm.get('notes').trim(), categories: selectedCategories };
+    const updates = { payment_methods:editForm.getAll('payment_methods'),payment_other:editForm.getAll('payment_methods').includes('other')?String(editForm.get('payment_other')||'').trim():'', starts: editForm.get('starts'), ends: editForm.get('ends'), title: editForm.get('title').trim(), notes: editForm.get('notes').trim(), categories: selectedCategories };
     if (!updates.starts || !updates.ends || updates.ends <= updates.starts) { errorElement.textContent = 'End time must be after start time.'; saveButton.disabled=false; return; }
     const { data, error } = await adminDb.from('yard_sales').update(updates).eq('id', id).select().single();
     if (error) { errorElement.textContent = 'Could not save the changes. Please sign in again and retry.'; saveButton.disabled = false; return; }
@@ -1321,6 +1331,8 @@ $('#confirm-location').onclick = () => {
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && document.body.classList.contains('picking')) endPicking(); });
 function inNeighborhood(lat, lng) { return Number.isFinite(lat) && Number.isFinite(lng) && lat >= 33.23 && lat <= 33.27 && lng >= -96.925 && lng <= -96.88; }
 
+$('#payment-fields').innerHTML=paymentFields();
+setupPaymentFields($('#stop-form'));
 const photoPicker=setupPhotoPicker($('#sale-photos'),$('#photo-previews'),$('#photo-status'));
 $('#stop-form').onsubmit = async (event) => {
   event.preventDefault();
@@ -1341,7 +1353,7 @@ $('#stop-form').onsubmit = async (event) => {
   const starts = form.get('starts');
   const ends = form.get('ends');
   if (!starts || !ends || ends <= starts) { errorElement.textContent = 'Choose an end time after your start time.'; return; }
-  const stop = { starts, ends, title, address, address_key: chosenAddressKey, categories: selectedCategories, notes: form.get('notes').trim(), lat: chosenLocation[0], lng: chosenLocation[1], event_date: config.eventDate };
+  const stop = { payment_methods:form.getAll('payment_methods'),payment_other:form.getAll('payment_methods').includes('other')?String(form.get('payment_other')||'').trim():'', starts, ends, title, address, address_key: chosenAddressKey, categories: selectedCategories, notes: form.get('notes').trim(), lat: chosenLocation[0], lng: chosenLocation[1], event_date: config.eventDate };
   $('#save-stop').disabled = true;
   try {
     let id;
@@ -1360,6 +1372,7 @@ $('#stop-form').onsubmit = async (event) => {
     }
     dialog.close();
     event.target.reset();
+    setupPaymentFields($('#stop-form'));
     photoPicker.reset();
     chosenLocation = null;
     chosenAddressKey = '';
