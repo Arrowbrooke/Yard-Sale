@@ -104,10 +104,11 @@
       <p id="address-help" class="field-help" role="status">Choose a spot on the map, or type the address yourself.</p>
       <p class="lookup-credit">Neighborhood addresses: <a href="https://openaddresses.io/" target="_blank" rel="noopener noreferrer">OpenAddresses</a> / Denton County</p>
       <fieldset>
-        <legend>What are you selling? <span class="muted">Choose all that apply</span></legend>
+        <legend>What are you selling? <span class="optional-label">optional</span></legend>
+        <p class="field-help">Choose any that apply. Leave blank to list your sale as Other.</p>
         <div class="category-options"><label><input name="categories" type="checkbox" value="mens"><span>👔 Men's Clothes</span></label><label><input name="categories" type="checkbox" value="womens"><span>👗 Women's Clothes</span></label><label><input name="categories" type="checkbox" value="kids"><span>👕 Kids' Clothes</span></label><label><input name="categories" type="checkbox" value="toys"><span>🧸 Toys</span></label><label><input name="categories" type="checkbox" value="electronics"><span>🔌 Electronics</span></label><label><input name="categories" type="checkbox" value="household"><span>🏠 Home Goods</span></label><label><input name="categories" type="checkbox" value="furniture"><span>🪑 Furniture</span></label><label><input name="categories" type="checkbox" value="tools"><span>🛠️ Tools & Outdoors</span></label><label><input name="categories" type="checkbox" value="books"><span>📚 Books & Games</span></label><label><input name="categories" type="checkbox" value="other"><span>🏷️ Other</span></label></div>
       </fieldset>
-      <div class="two-col"><label>Start time (Central)<input name="starts" type="time" required></label><label>End time (Central)<input name="ends" type="time" required></label></div><label>Good to know
+      <div class="two-col"><label>Start time (Central) <span class="optional-label">optional</span><input name="starts" type="time"></label><label>End time (Central) <span class="optional-label">optional</span><input name="ends" type="time"></label></div><label>Good to know
         <textarea name="notes" maxlength="400" rows="2" placeholder="Describe your items, sizes, payment options, or anything shoppers should know."></textarea>
       </label>
       <div id="payment-fields"></div>
@@ -193,7 +194,7 @@
   <script src="vendor/leaflet-maplibre-gl.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="config.js?v=payments-moderation-5"></script>
-  <script src="app.js?v=later-photo-search-9" type="module"></script>
+  <script src="app.js?v=optional-times-address-10" type="module"></script>
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"2f118e861b7d468389a946f926e17eb5"}'></script>
 
 </body>

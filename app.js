@@ -2,7 +2,7 @@ import { displayCategory } from './display-category.js?v=20261028-category-color
 import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js';
 import { pickStopName } from './stop-names.js?v=20261028-many-names';
 import { lookupAddress } from './address-lookup.js';
-import { applyAddressCorrections } from './address-corrections.js?v=20261028-address-precision-v4';
+import { applyAddressCorrections } from './address-corrections.js?v=20261112-open-space';
 import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=later-uploads-3';
 
 const $ = (selector) => document.querySelector(selector);
@@ -20,7 +20,10 @@ function setupPaymentFields(form){
   const sync=()=>{field.hidden=!checkbox.checked;field.querySelector('input').disabled=!checkbox.checked;};checkbox.onchange=sync;sync();
 }
 const saleHours = stop => {
+ if(!stop.starts&&!stop.ends)return '';
  const fmt = v => { const [h,m] = String(v || '00:00').split(':').map(Number); return (h % 12 || 12) + (m ? ':' + String(m).padStart(2,'0') : '') + (h >= 12 ? ' PM' : ' AM'); };
+ if(!stop.ends)return 'Starts '+fmt(stop.starts)+' CT';
+ if(!stop.starts)return 'Until '+fmt(stop.ends)+' CT';
  return fmt(stop.starts) + ' – ' + fmt(stop.ends) + ' CT';
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -427,9 +430,9 @@ function ensureMapEnhancements() {
       'text-field': ['to-string', ['get', 'number']],
       'text-font': ['Noto Sans Bold'],
       'text-size': ['interpolate', ['linear'], ['zoom'], 16.6, 7, 17.5, 9, 19, 12],
-      'text-allow-overlap': true,
-      'text-ignore-placement': true,
-      'text-padding': 0
+      'text-allow-overlap': false,
+      'text-ignore-placement': false,
+      'text-padding': 2
     },
     paint: {
       'text-color': '#334c40',
@@ -604,13 +607,14 @@ function snapVisibleAddressLabels() {
   const buildings = mapBuildingFeatures();
   if (!buildings.length) return;
   const bounds = map.getBounds().pad(0.2);
-  const parts = [];
-  for (const feature of buildings) {
-    const geometry = feature.geometry;
-    if (geometry?.type === 'Polygon') parts.push(geometry);
-    if (geometry?.type === 'MultiPolygon') {
-      for (const coordinates of geometry.coordinates) parts.push({ type: 'Polygon', coordinates });
-    }
+  // A verified house already owns its footprint. Do not move another label onto it.
+  const occupiedHomes = new Set();
+  for (const feature of neighborhoodAddressData.features) {
+    if (feature.properties?.building_match_m == null) continue;
+    const [lng, lat] = feature.geometry.coordinates;
+    if (!bounds.contains([lat,lng])) continue;
+    const home = findHome(buildings, lng, lat, 5);
+    if (home) occupiedHomes.add(homeKey(home));
   }
   const visibleAddresses = [];
   const pairs = [];
@@ -620,18 +624,17 @@ function snapVisibleAddressLabels() {
     const lat = feature.properties.address_lat ?? feature.geometry.coordinates[1];
     if (!bounds.contains([lat, lng])) return;
     visibleAddresses.push({ feature, index, lng, lat });
-    for (let buildingIndex = 0; buildingIndex < parts.length; buildingIndex += 1) {
-      const distance = distanceToHome(parts[buildingIndex], lng, lat);
-      if (distance <= 45) pairs.push({ addressIndex: index, buildingIndex, distance });
-    }
+    const home = findHome(buildings, lng, lat, 18);
+    if (home && !occupiedHomes.has(homeKey(home))) pairs.push({ addressIndex: index, home, distance: distanceToHome(home,lng,lat) });
   });
   pairs.sort((a, b) => a.distance - b.distance);
   const assignments = new Map();
   const usedBuildings = new Set();
   for (const pair of pairs) {
-    if (assignments.has(pair.addressIndex) || usedBuildings.has(pair.buildingIndex)) continue;
-    assignments.set(pair.addressIndex, parts[pair.buildingIndex]);
-    usedBuildings.add(pair.buildingIndex);
+    const key = homeKey(pair.home);
+    if (assignments.has(pair.addressIndex) || usedBuildings.has(key)) continue;
+    assignments.set(pair.addressIndex, pair.home);
+    usedBuildings.add(key);
   }
   let changed = false;
   for (const { feature, index, lng, lat } of visibleAddresses) {
@@ -999,7 +1002,7 @@ function render() {
     const category = displayCategory(stop);
     const categoryInfo = displayCategories[category];
     const description=stop.title!==stop.address&&stop.title!==`Yard sale at ${stop.address}`?stop.title:stop.notes;
-    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.address)}</span>${description?`<span class="stop-address">${escapeHtml(description)}</span>`:''}<span class="stop-time">${escapeHtml(saleHours(stop))}</span><span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span>${paymentDescription(stop)?`<span class="stop-payments">${escapeHtml(paymentDescription(stop))}</span>`:''}</span></button>`;
+    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.address)}</span>${description?`<span class="stop-address">${escapeHtml(description)}</span>`:''}${saleHours(stop)?`<span class="stop-time">${escapeHtml(saleHours(stop))}</span>`:''}<span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span>${paymentDescription(stop)?`<span class="stop-payments">${escapeHtml(paymentDescription(stop))}</span>`:''}</span></button>`;
   }).join('') : `<div class="empty"><span class="empty-icon">🏷️</span><strong>${stops.length ? 'No matching stops' : 'Be the first on the block'}</strong>${stops.length ? 'Try another filter or search.' : 'Add your house to the neighborhood Yard Sale map.'}</div>`;
   $('#stop-list').querySelectorAll('[data-stop]').forEach((button) => { button.onclick = () => showDetail(button.dataset.stop); });
   if (selectedId && !visible.some((stop) => stop.id === selectedId)) closeDetail();
@@ -1074,10 +1077,10 @@ function showDetail(id, pan = true) {
       ${Object.entries(categories).map(([key, item]) => `<label><input name="categories" type="checkbox" value="${key}" ${stop.categories.includes(key) ? 'checked' : ''}><span>${item.icon} ${item.label}</span></label>`).join('')}
     </div></fieldset>
     <label>Good to know<textarea name="notes" maxlength="400" rows="2">${escapeHtml(stop.notes || '')}</textarea></label>${paymentFields(stop)}
-    <div class="two-col"><label>Starts<input name="starts" type="time" value="${escapeHtml(stop.starts?.slice(0,5))}" required></label><label>Ends<input name="ends" type="time" value="${escapeHtml(stop.ends?.slice(0,5))}" required></label></div><p class="error organizer-edit-error" role="alert"></p>
+    <div class="two-col"><label>Starts (optional)<input name="starts" type="time" value="${escapeHtml(stop.starts?.slice(0,5))}"></label><label>Ends (optional)<input name="ends" type="time" value="${escapeHtml(stop.ends?.slice(0,5))}"></label></div><p class="error organizer-edit-error" role="alert"></p>
     <div class="organizer-actions"><button class="primary" type="submit">Save changes</button><button class="danger" id="organizer-remove" type="button">Remove from map</button></div>
   </form>` : '';
-  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${paymentDescription(stop)?`<p class="sale-payments"><strong>Accepted payments:</strong> ${escapeHtml(paymentDescription(stop))}</p>`:''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section><button id="add-sale-photos" class="primary add-sale-photos" type="button">Add photos to this sale</button>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
+  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p>${saleHours(stop)?`<p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>`:''}${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${paymentDescription(stop)?`<p class="sale-payments"><strong>Accepted payments:</strong> ${escapeHtml(paymentDescription(stop))}</p>`:''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section><button id="add-sale-photos" class="primary add-sale-photos" type="button">Add photos to this sale</button>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
   $('#detail').hidden = false;
   if(!demo){
     renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db),isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
@@ -1102,11 +1105,11 @@ function showDetail(id, pan = true) {
     const editForm = new FormData(event.target);
     const selectedCategories = [...new Set(editForm.getAll('categories'))];
     const errorElement = $('.organizer-edit-error');
-    if (!selectedCategories.length) { errorElement.textContent = 'Choose at least one offering, or remove the home from the map.'; return; }
+    if (!selectedCategories.length) selectedCategories.push('other');
     const saveButton = event.target.querySelector('[type="submit"]');
     saveButton.disabled = true;
-    const updates = { payment_methods:editForm.getAll('payment_methods'),payment_other:editForm.getAll('payment_methods').includes('other')?String(editForm.get('payment_other')||'').trim():'', starts: editForm.get('starts'), ends: editForm.get('ends'), title: editForm.get('title').trim(), notes: editForm.get('notes').trim(), categories: selectedCategories };
-    if (!updates.starts || !updates.ends || updates.ends <= updates.starts) { errorElement.textContent = 'End time must be after start time.'; saveButton.disabled=false; return; }
+    const updates = { payment_methods:editForm.getAll('payment_methods'),payment_other:editForm.getAll('payment_methods').includes('other')?String(editForm.get('payment_other')||'').trim():'', starts: editForm.get('starts')||null, ends: editForm.get('ends')||null, title: editForm.get('title').trim(), notes: editForm.get('notes').trim(), categories: selectedCategories };
+    if (updates.starts && updates.ends && updates.ends <= updates.starts) { errorElement.textContent = 'End time must be after start time.'; saveButton.disabled=false; return; }
     const { data, error } = await adminDb.from('yard_sales').update(updates).eq('id', id).select().single();
     if (error) { errorElement.textContent = 'Could not save the changes. Please sign in again and retry.'; saveButton.disabled = false; return; }
     stops = stops.map((item) => item.id === id ? data : item);
@@ -1306,6 +1309,22 @@ function chooseFormAddress(address) {
   map.setView(chosenLocation, 19);
 }
 
+function typedVerifiedAddress(value){
+  const query=normalizeAddressText(value);
+  return neighborhoodAddresses.find(address=>{
+    if(address.search===query)return true;
+    if(!query.startsWith(address.search+' '))return false;
+    const suffix=query.slice(address.search.length+1);
+    return /^(?:(?:aubrey|little elm|prosper|arrowbrooke)(?: (?:tx|texas))?(?: \d{5}(?: \d{4})?)?|(?:tx|texas)(?: \d{5}(?: \d{4})?)?|\d{5}(?: \d{4})?)$/.test(suffix);
+  });
+}
+function selectTypedAddress(address){
+  chosenLocation=[address.lat,address.lng];chosenAddressKey=address.search;
+  formAddressOptions.hidden=true;
+  $('#location-label').textContent='✓ Verified ArrowBrooke address.';
+  $('#address-help').textContent='Address verified. No map selection is needed.';
+  $('#pick-location').textContent='⌖ Show selected address on map';
+}
 formAddressInput.oninput = async () => {
   await addressDataPromise;
   const query = normalizeAddressText(formAddressInput.value);
@@ -1316,6 +1335,8 @@ formAddressInput.oninput = async () => {
     $('#pick-location').textContent = '⌖ Choose location on map';
   }
   if (query.length < 2 || !addressDataLoaded) { formAddressOptions.hidden = true; return; }
+  const exact=typedVerifiedAddress(formAddressInput.value);
+  if(exact){selectTypedAddress(exact);return;}
   const matches = neighborhoodAddresses.filter((address) => address.search.includes(query))
     .sort((a, b) => Number(!a.search.startsWith(query)) - Number(!b.search.startsWith(query)) || a.search.localeCompare(b.search)).slice(0, 8);
   formAddressOptions.innerHTML = matches.map((address, index) => `<button type="button" class="form-address-option" role="option" data-address-option="${index}">${escapeHtml(address.number)} ${escapeHtml(address.street)}</button>`).join('');
@@ -1399,18 +1420,24 @@ $('#stop-form').onsubmit = async (event) => {
   errorElement.textContent = '';
   if(photoPicker.busy){errorElement.textContent='Please wait while your photos finish preparing.';return;}
   const selectedPhotos=photoPicker.files;
+  await addressDataPromise;
+  if(!addressDataLoaded){errorElement.textContent='The neighborhood address list could not load. Please check your connection and reload the map.';return;}
+  const verified=typedVerifiedAddress(form.get('address'));
+  if(!verified){errorElement.textContent='We could not match that address. Enter your house number and street, choose a matching suggestion, or ask the organizer if your address is missing.';return;}
+  selectTypedAddress(verified);
+  const canonicalAddress=`${verified.number} ${verified.street}`;
+  form.set('address',canonicalAddress);formAddressInput.value=canonicalAddress;
   if (submissionsClosed()) { errorElement.textContent = 'Yard Sale home submissions are closed for this event.'; return; }
   const selectedCategories = [...new Set(form.getAll('categories'))];
-  if (!selectedCategories.length) { errorElement.textContent = 'Choose at least one item category.'; return; }
-  if (!chosenLocation) { errorElement.textContent = 'Choose your house location on the map first.'; return; }
+  if (!selectedCategories.length) selectedCategories.push('other');
   const title = form.get('title').trim() || 'Yard sale at ' + form.get('address').trim();
   const address = form.get('address').trim();
   if (!address) { errorElement.textContent = 'Enter the house number and street address.'; return; }
   if (!chosenAddressKey || normalizeAddressText(address) !== chosenAddressKey) { errorElement.textContent = 'Choose your exact home from the verified ArrowBrooke address list.'; return; }
   if (!db && !demo) { errorElement.textContent = 'The public map is not connected yet. The organizer needs to finish the one-time setup.'; return; }
-  const starts = form.get('starts');
-  const ends = form.get('ends');
-  if (!starts || !ends || ends <= starts) { errorElement.textContent = 'Choose an end time after your start time.'; return; }
+  const starts = form.get('starts')||null;
+  const ends = form.get('ends')||null;
+  if (starts && ends && ends <= starts) { errorElement.textContent = 'Choose an end time after your start time, or leave the times blank.'; return; }
   const stop = { payment_methods:form.getAll('payment_methods'),payment_other:form.getAll('payment_methods').includes('other')?String(form.get('payment_other')||'').trim():'', starts, ends, title, address, address_key: chosenAddressKey, categories: selectedCategories, notes: form.get('notes').trim(), lat: chosenLocation[0], lng: chosenLocation[1], event_date: config.eventDate };
   $('#save-stop').disabled = true;
   try {

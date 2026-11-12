@@ -1,4 +1,5 @@
 const removedAddressKeys = new Set([
+  '1242 ARROW BROOKE AVE',
   '891 PLEASANT KNOLL TRL',
   '903 WHITE WATER WAY',
   '602 ARROW BROOKE AVE',
