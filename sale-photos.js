@@ -1,7 +1,7 @@
 const BUCKET='yard-sale-photos';
 const MAX_PHOTOS=5;
 
-export function setupPhotoPicker(input,preview,status) {
+export function setupPhotoPicker(input,preview,status,maxPhotos=MAX_PHOTOS) {
   let photos=[];
   let busy=false;
   const render=()=>{
@@ -13,11 +13,11 @@ export function setupPhotoPicker(input,preview,status) {
       button.onclick=()=>{URL.revokeObjectURL(photos[index].url);photos.splice(index,1);render();};
       tile.append(img,button);preview.append(tile);
     });
-    status.textContent=photos.length?`${photos.length} of 5 photos selected. Photos appear only after organizer approval.`:'Take photos or choose from your library. Up to 5; organizer approval required.';
+    status.textContent=photos.length?`${photos.length} of ${maxPhotos} available slots selected. Photos appear only after organizer approval.`:`Take photos or choose from your library. Up to ${maxPhotos} more; organizer approval required.`;
   };
-  input.addEventListener('change',async()=>{
+  const handleChange=async()=>{
     const files=Array.from(input.files||[]);input.value='';
-    if(photos.length+files.length>MAX_PHOTOS){status.textContent='Choose no more than 5 photos in total. Remove a preview to make room.';return;}
+    if(photos.length+files.length>maxPhotos){status.textContent=`This sale has room for ${maxPhotos} more photos. Remove a preview to make room.`;return;}
     busy=true;input.disabled=true;status.textContent='Preparing photos…';
     try{
       for(const file of files){
@@ -28,9 +28,11 @@ export function setupPhotoPicker(input,preview,status) {
       render();
     }catch(error){render();status.textContent=error.message||'Could not open that photo. Try a JPEG or PNG, or take a new photo.';}
     finally{busy=false;input.disabled=false;}
-  });
+  };
+  input.addEventListener('change',handleChange);
   render();
-  return {get files(){return photos.map(p=>p.blob);},get busy(){return busy;},reset(){photos.forEach(p=>URL.revokeObjectURL(p.url));photos=[];render();}};
+  const reset=()=>{photos.forEach(p=>URL.revokeObjectURL(p.url));photos=[];render();};
+  return {get files(){return photos.map(p=>p.blob);},get busy(){return busy;},reset,destroy(){input.removeEventListener('change',handleChange);reset();}};
 }
 
 async function compressPhoto(file){
@@ -62,8 +64,8 @@ export async function uploadSalePhotos(client,saleId,files,onProgress=()=>{}){
     return paths.length;
   }catch(error){
     // Reconcile a network failure after submission before removing uploaded files.
-    const {data:review,error:lookupError}=await client.from('sale_photo_reviews').select('photo_paths').eq('sale_id',saleId).maybeSingle();
-    if(review&&paths.every(path=>review.photo_paths.includes(path)))return paths.length;
+    const {data:reviews,error:lookupError}=await client.from('sale_photo_reviews').select('photo_paths').eq('sale_id',saleId);
+    if(paths.length&&reviews?.some(review=>paths.every(path=>review.photo_paths.includes(path))))return paths.length;
     if(paths.length&&!lookupError)await client.storage.from(BUCKET).remove(paths);
     throw error;
   }
@@ -106,13 +108,22 @@ export async function renderSalePhotos(container,stop,client,isOrganizer=false,o
 
 export async function renderPhotoReview(container,stop,client,isOrganizer,onChange){
   if(!client||!container)return;
-  const {data:review,error}=await client.from('sale_photo_reviews').select('*').eq('sale_id',stop.id).maybeSingle();
-  if(!container.isConnected||error||!review)return;
-  if(!isOrganizer){container.textContent=review.status==='pending'?'Your photos are awaiting organizer approval.':review.status==='rejected'?'Your photos were not approved for the public map.':'';return;}
+  const {data:reviews,error}=await client.from('sale_photo_reviews').select('*').eq('sale_id',stop.id).order('created_at');
+  if(!container.isConnected||error||!reviews?.length)return;
+  if(!isOrganizer){const pending=reviews.some(review=>review.status==='pending');container.textContent=pending?'Your photos are awaiting organizer approval.':reviews.every(review=>review.status==='rejected')?'Your photos were not approved for the public map.':'';return;}
+  container.replaceChildren();
+  for(const review of reviews){
+    if(review.status!=='pending')continue;
+    const batch=document.createElement('section');batch.className='photo-review-batch';container.append(batch);
+    await renderPhotoReviewBatch(batch,review,client,onChange);
+  }
+}
+
+async function renderPhotoReviewBatch(container,review,client,onChange){
   const pending=review.photo_paths.filter(path=>!(review.approved_paths||[]).includes(path)&&!(review.rejected_paths||[]).includes(path));
   if(!pending.length)return;
   const heading=document.createElement('h3');heading.textContent='Photos awaiting your approval';
-  const note=document.createElement('p');note.textContent='Select the photos to approve or deny. Denied photos are deleted from storage.';
+  const note=document.createElement('p');note.textContent=`Submitted ${new Date(review.created_at).toLocaleString()}. Select the photos to approve or deny. Denied photos are deleted from storage.`;
   const selectAllLabel=document.createElement('label');selectAllLabel.className='photo-select-all';
   const selectAll=document.createElement('input');selectAll.type='checkbox';selectAllLabel.append(selectAll,document.createTextNode(' Select all photos'));
   const gallery=document.createElement('div');

@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="vendor/leaflet.css">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="style.css?v=yard-sale-1">
-  <link rel="stylesheet" href="yard-sale.css?v=address-first-6">
+  <link rel="stylesheet" href="yard-sale.css?v=later-photo-uploads-8">
 </head>
 <body>
   <main>
@@ -90,7 +90,7 @@
         <button type="button" class="icon-button close-dialog" aria-label="Close">×</button>
       </div>
       <p class="muted">Join the neighborhood yard sale on Saturday, November 14.</p>
-      <div class="approval-note"><strong>One listing is allowed per home.</strong><br>Your verified ArrowBrooke address will appear on the map as soon as you submit it.</div>
+      <div class="approval-note"><strong>One listing is allowed per home.</strong><br>Your verified ArrowBrooke address will appear on the map as soon as you submit it. You or a family member can open the home on the map and add photos later.</div>
       <button type="button" id="pick-location" class="secondary">⌖ Choose location on map</button>
       <p id="location-label" class="muted">Pick your house first; we’ll suggest its address.</p>
       <label>Display name <span class="optional-label">optional</span>
@@ -179,13 +179,21 @@
     <button id="message-login" class="primary" type="button" hidden>Organizer login</button>
   </dialog>
   <dialog id="photo-reviews-dialog"><div class="dialog-top"><h2>Photo approvals</h2><button id="close-photo-reviews" class="icon-button" type="button" aria-label="Close photo reviews">×</button></div><div id="photo-reviews-list" aria-live="polite"></div></dialog>
+  <dialog id="additional-photos-dialog"><form id="additional-photos-form">
+    <div class="dialog-top"><div><div class="eyebrow">ADD PHOTOS ANYTIME</div><h2>Add sale photos</h2></div><button id="close-additional-photos" class="icon-button" type="button" aria-label="Close photo upload">×</button></div>
+    <p id="additional-photos-address" class="muted"></p><p class="fine-print">Anyone can add photos to a listed sale. Photos stay private until the organizer approves them.</p>
+    <p id="additional-photos-capacity" class="muted" role="status"></p>
+    <label class="photo-picker-label">Choose photos<input id="additional-sale-photos" type="file" accept="image/*" multiple aria-describedby="additional-photo-status"></label>
+    <p id="additional-photo-status" class="field-help" role="status"></p><div id="additional-photo-previews" class="photo-preview-grid"></div>
+    <p id="additional-photos-error" class="error" role="alert"></p><button id="submit-additional-photos" class="primary" type="submit">Submit photos for approval</button>
+  </form></dialog>
   <div id="toast" role="status" hidden></div>
   <script src="vendor/leaflet.js"></script>
   <script src="vendor/maplibre-gl.js"></script>
   <script src="vendor/leaflet-maplibre-gl.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="config.js?v=payments-moderation-5"></script>
-  <script src="app.js?v=single-sale-color-7" type="module"></script>
+  <script src="app.js?v=later-photo-uploads-8" type="module"></script>
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"2f118e861b7d468389a946f926e17eb5"}'></script>
 
 </body>

@@ -3,7 +3,7 @@ import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js'
 import { pickStopName } from './stop-names.js?v=20261028-many-names';
 import { lookupAddress } from './address-lookup.js';
 import { applyAddressCorrections } from './address-corrections.js?v=20261028-address-precision-v4';
-import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=individual-photos-2';
+import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=later-uploads-3';
 
 const $ = (selector) => document.querySelector(selector);
 const config = window.YARD_SALE_CONFIG;
@@ -999,6 +999,56 @@ function render() {
   if (selectedId && !visible.some((stop) => stop.id === selectedId)) closeDetail();
 }
 
+let additionalPhotoPicker=null;
+let additionalPhotoSaleId=null;
+let additionalPhotosSubmitting=false;
+function closeAdditionalPhotos(){
+  if(additionalPhotosSubmitting)return;
+  additionalPhotoPicker?.destroy();additionalPhotoPicker=null;
+  $('#additional-photos-dialog').close();
+}
+async function openAdditionalPhotos(id){
+  const stop=stops.find(item=>item.id===id);if(!stop)return;
+  additionalPhotoPicker?.destroy();additionalPhotoPicker=null;additionalPhotoSaleId=id;
+  const input=$('#additional-sale-photos'),button=$('#submit-additional-photos');
+  input.value='';input.disabled=true;button.disabled=true;
+  $('#additional-photo-previews').replaceChildren();$('#additional-photo-status').textContent='';$('#additional-photos-error').textContent='';
+  $('#additional-photos-address').textContent=stop.address;
+  $('#additional-photos-capacity').textContent='Checking available photo space…';
+  $('#additional-photos-dialog').showModal();
+  try{
+    let capacity;
+    if(demo){const used=stop.photo_previews?.length||0;capacity={used,remaining:Math.max(0,5-used)};}
+    else{
+      if(!db)throw new Error('Map is still connecting. Close this window and try again.');
+      if(!isOrganizer)await ensureVisitorSession();
+      const {data,error}=await(isOrganizer?adminDb:db).rpc('yard_sale_photo_capacity',{target_sale:id});
+      if(error)throw error;capacity=data;
+    }
+    if(!$('#additional-photos-dialog').open||additionalPhotoSaleId!==id)return;
+    $('#additional-photos-capacity').textContent=capacity.remaining?`${capacity.used} of 5 photo slots used. You can add ${capacity.remaining} more.`:'This sale already has 5 photos, including any awaiting approval. Ask the organizer to remove photos before adding more.';
+    if(!capacity.remaining)return;
+    additionalPhotoPicker=setupPhotoPicker(input,$('#additional-photo-previews'),$('#additional-photo-status'),capacity.remaining);
+    input.disabled=false;button.disabled=false;
+  }catch(error){$('#additional-photos-error').textContent=error.message||'Could not check this sale. Please close and try again.';}
+}
+$('#close-additional-photos').onclick=closeAdditionalPhotos;
+$('#additional-photos-dialog').addEventListener('cancel',event=>{event.preventDefault();closeAdditionalPhotos();});
+$('#additional-photos-form').onsubmit=async event=>{
+  event.preventDefault();const errors=$('#additional-photos-error');errors.textContent='';
+  if(additionalPhotoPicker?.busy){errors.textContent='Please wait while your photos finish preparing.';return;}
+  const files=additionalPhotoPicker?.files||[];
+  if(!files.length){errors.textContent='Choose at least one photo.';return;}
+  const id=additionalPhotoSaleId;additionalPhotosSubmitting=true;$('#submit-additional-photos').disabled=true;$('#close-additional-photos').disabled=true;
+  try{
+    if(demo){const stop=stops.find(item=>item.id===id);stop.photo_previews=[...(stop.photo_previews||[]),...files.map(blob=>URL.createObjectURL(blob))];}
+    else{await uploadSalePhotos(isOrganizer?adminDb:db,id,files,message=>$('#additional-photo-status').textContent=message);await loadStops();}
+    additionalPhotosSubmitting=false;closeAdditionalPhotos();showDetail(id,false);refreshPhotoReviewCount();
+    toast(demo?'Photos added to this preview only.':'Photos submitted. They will appear after organizer approval.');
+  }catch(error){errors.textContent='Could not submit the photos. The sale may have filled its available photo slots; close and reopen this window to check, then retry.';}
+  finally{additionalPhotosSubmitting=false;$('#submit-additional-photos').disabled=false;$('#close-additional-photos').disabled=false;}
+};
+
 function closeDetail() {
   selectedId = null;
   $('#detail').hidden = true;
@@ -1021,11 +1071,11 @@ function showDetail(id, pan = true) {
     <div class="two-col"><label>Starts<input name="starts" type="time" value="${escapeHtml(stop.starts?.slice(0,5))}" required></label><label>Ends<input name="ends" type="time" value="${escapeHtml(stop.ends?.slice(0,5))}" required></label></div><p class="error organizer-edit-error" role="alert"></p>
     <div class="organizer-actions"><button class="primary" type="submit">Save changes</button><button class="danger" id="organizer-remove" type="button">Remove from map</button></div>
   </form>` : '';
-  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${paymentDescription(stop)?`<p class="sale-payments"><strong>Accepted payments:</strong> ${escapeHtml(paymentDescription(stop))}</p>`:''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
+  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${paymentDescription(stop)?`<p class="sale-payments"><strong>Accepted payments:</strong> ${escapeHtml(paymentDescription(stop))}</p>`:''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section><button id="add-sale-photos" class="primary add-sale-photos" type="button">Add photos to this sale</button>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
   $('#detail').hidden = false;
   if(!demo){
     renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db),isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
-    if(isOrganizer||stop.created_by===currentUserId)renderPhotoReview($('#photo-review'),stop,isOrganizer?adminDb:db,isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
+    if(isOrganizer||currentUserId)renderPhotoReview($('#photo-review'),stop,isOrganizer?adminDb:db,isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
   }else if(stop.photo_previews?.length){
     const gallery=$('#sale-photo-gallery');gallery.hidden=false;const grid=document.createElement('div');grid.className='sale-photo-grid';
     for(const url of stop.photo_previews){const img=document.createElement('img');img.src=url;img.alt='Sample sale photo';grid.append(img);}gallery.append(grid);
@@ -1036,6 +1086,7 @@ function showDetail(id, pan = true) {
     try{await uploadSalePhotos(isOrganizer?adminDb:db,id,photoRetries.get(id),message=>button.textContent=message);photoRetries.delete(id);await loadStops();showDetail(id,false);toast('Photos submitted for organizer approval.');}
     catch{button.disabled=false;button.textContent='Retry photo upload';toast('Your sale is saved. Photos could not upload; please retry.');}
   };
+  $('#add-sale-photos').onclick=()=>openAdditionalPhotos(id);
   $('.close-detail').onclick = () => { closeDetail(); render(); };
   $('#directions-stop').onclick = () => openDirections(stop);
   $('#share-stop').onclick = () => share(id);
