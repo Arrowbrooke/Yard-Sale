@@ -1305,8 +1305,8 @@ $('#stop-form').onsubmit = async (event) => {
     let id;
     if (demo) { id = crypto.randomUUID(); stops.push({ ...stop, id }); }
     else {
-      await ensureVisitorSession();
-      const { data, error } = await db.from('yard_sales').insert(stop).select().single();
+      if (!isOrganizer) await ensureVisitorSession();
+      const { data, error } = await (isOrganizer ? adminDb : db).from('yard_sales').insert(stop).select().single();
       if (error) throw error;
       id = data.id;
       await loadStops();

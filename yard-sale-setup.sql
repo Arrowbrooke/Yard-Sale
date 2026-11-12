@@ -38,7 +38,7 @@ begin
  if canonical.address_key is null then raise exception 'Choose a verified Arrowbrooke home.' using errcode='23514'; end if;
  new.address_key:=canonical.address_key; new.address:=canonical.display_address; new.lat:=canonical.lat; new.lng:=canonical.lng;
  perform pg_advisory_xact_lock(hashtext(new.created_by::text));
- if (select count(*) from public.yard_sales where created_by=new.created_by and event_date=new.event_date)>=3 then raise exception 'You may add up to three homes for this event.'; end if;
+ if coalesce(auth.jwt()->>'email','')<>'organizer@arrowbrooke-map.invalid' and (select count(*) from public.yard_sales where created_by=new.created_by and event_date=new.event_date)>=3 then raise exception 'You may add up to three homes for this event.'; end if;
  return new;
 end;
 $$;
