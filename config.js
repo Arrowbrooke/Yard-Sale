@@ -7,7 +7,7 @@ window.YARD_SALE_CONFIG = {
   organizerEmail: 'organizer@arrowbrooke-map.invalid',
   // Public half of the Web Push key pair. The private half lives only in
   // Supabase Edge Function secrets and is never shipped to visitors.
-  vapidPublicKey: '',
+  vapidPublicKey: 'BA9S9zdkPSLrbjMOe0GETWmOYGy7Obua-6FRrSS6Fc_WGCLmyBRM0aRBEVky-K7PySk85yBwJyc7doGLLwpZaBg',
   reverseGeocodeUrl: 'https://photon.komoot.io/reverse',
   addressSearchUrl: 'https://photon.komoot.io/api/',
   center: [33.2475, -96.9025],

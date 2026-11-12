@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ArrowBrooke Yard Sale">
   <title>ArrowBrooke Yard Sale · November 14</title>
-  <link rel="icon" href="icon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
+  <link rel="icon" href="icon.svg?v=fall-leaf-1">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=fall-leaf-1">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="vendor/leaflet.css">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="style.css?v=yard-sale-1">
-  <link rel="stylesheet" href="yard-sale.css?v=1">
+  <link rel="stylesheet" href="yard-sale.css?v=photos-notifications-3">
 </head>
 <body>
   <main>
@@ -57,6 +57,7 @@
           <span id="export-status">Download a backup of the current home list.</span>
           <button id="organizer-export" class="secondary" type="button">Export home list (CSV)</button>
         </div>
+        <button id="organizer-photo-reviews" class="secondary" type="button">Review photos</button>
         <button id="organizer-messages" class="secondary" type="button">View map messages</button>
         <button id="organizer-logout" class="secondary" type="button">Sign out</button>
       </div>
@@ -109,6 +110,9 @@
       <div class="two-col"><label>Start time (Central)<input name="starts" type="time" required></label><label>End time (Central)<input name="ends" type="time" required></label></div><label>Good to know
         <textarea name="notes" maxlength="400" rows="2" placeholder="Describe your items, sizes, payment options, or anything shoppers should know."></textarea>
       </label>
+      <label class="photo-picker-label">Photos <span class="optional-label">optional · up to 5</span><input id="sale-photos" type="file" accept="image/*" multiple aria-describedby="photo-status"></label>
+      <p id="photo-status" class="field-help" role="status"></p><div id="photo-previews" class="photo-preview-grid"></div>
+      <p class="fine-print">Your home listing appears immediately. Photos stay private until the organizer approves them.</p>
       <p id="form-error" class="error" role="alert"></p>
       <button type="submit" id="save-stop" class="primary">Add my sale</button>
       <p class="fine-print">Only submit a home you are authorized to list. The address and notes will be public to anyone with the map link.</p>
@@ -173,13 +177,14 @@
     <div id="message-list" aria-live="polite"></div>
     <button id="message-login" class="primary" type="button" hidden>Organizer login</button>
   </dialog>
+  <dialog id="photo-reviews-dialog"><div class="dialog-top"><h2>Photo approvals</h2><button id="close-photo-reviews" class="icon-button" type="button" aria-label="Close photo reviews">×</button></div><div id="photo-reviews-list" aria-live="polite"></div></dialog>
   <div id="toast" role="status" hidden></div>
   <script src="vendor/leaflet.js"></script>
   <script src="vendor/maplibre-gl.js"></script>
   <script src="vendor/leaflet-maplibre-gl.js"></script>
   <script src="vendor/supabase.js"></script>
-  <script src="config.js?v=20261028-push-notifications"></script>
-  <script src="app.js?v=20261031-viewer-scaling" type="module"></script>
+  <script src="config.js?v=photos-notifications-3"></script>
+  <script src="app.js?v=photos-notifications-3" type="module"></script>
 
 </body>
 </html>

@@ -3,6 +3,7 @@ import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js'
 import { pickStopName } from './stop-names.js?v=20261028-many-names';
 import { lookupAddress } from './address-lookup.js';
 import { applyAddressCorrections } from './address-corrections.js?v=20261028-address-precision-v4';
+import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=fall-photos-1';
 
 const $ = (selector) => document.querySelector(selector);
 const config = window.YARD_SALE_CONFIG;
@@ -42,6 +43,12 @@ let neighborhoodAddressData = { type: 'FeatureCollection', features: [] };
 let neighborhoodAddresses = [];
 let addressDataLoaded = false;
 let serviceWorkerRegistrationPromise = null;
+const photoRetries=new Map();
+async function refreshPhotoReviewCount(){
+  if(!isOrganizer||!adminDb)return;
+  const button=$('#organizer-photo-reviews');
+  try{const count=await photoReviewCount(adminDb);button.textContent=`Review photos (${count})`;}catch{button.textContent='Review photos';}
+}
 
 function isIosDevice() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -51,7 +58,16 @@ function isStandaloneApp() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
-function prepareServiceWorker() { return null; }
+function prepareServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  if (!serviceWorkerRegistrationPromise) {
+    serviceWorkerRegistrationPromise = navigator.serviceWorker.register('./sw.js?v=yard-sale-2', {scope:'./'}).then(async registration => {
+      await navigator.serviceWorker.ready;
+      return registration;
+    }).catch(error => {serviceWorkerRegistrationPromise=null;throw error;});
+  }
+  return serviceWorkerRegistrationPromise;
+}
 
 function applicationServerKey(value) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -114,6 +130,11 @@ async function togglePushNotifications() {
   const button = $('#notification-toggle');
   button.disabled = true;
   try {
+    // Request iPhone permission directly from the user's tap.
+    if(button.dataset.subscribed!=='true'&&Notification.permission==='default'){
+      const permission=await Notification.requestPermission();
+      if(permission!=='granted')throw new Error('Permission was not granted');
+    }
     const registration = await prepareServiceWorker();
     let subscription = await registration.pushManager.getSubscription();
     if (subscription) {
@@ -218,6 +239,7 @@ function setOrganizerMode(active) {
   if (active) {
     updateNotificationControls();
     updateExportStatus();
+    refreshPhotoReviewCount();
   }
   if (selectedId) showDetail(selectedId, false);
   if (active && $('#messages-dialog')?.open) $('#organizer-messages')?.click();
@@ -377,7 +399,7 @@ function ensureMapEnhancements() {
     source: 'arrowbrooke-buildings',
     minzoom: 13,
     paint: {
-      'fill-color': '#85899e',
+      'fill-color': '#b9bcae',
       'fill-opacity': 0.24,
       'fill-antialias': false
     }
@@ -989,8 +1011,21 @@ function showDetail(id, pan = true) {
     <div class="two-col"><label>Starts<input name="starts" type="time" value="${escapeHtml(stop.starts?.slice(0,5))}" required></label><label>Ends<input name="ends" type="time" value="${escapeHtml(stop.ends?.slice(0,5))}" required></label></div><p class="error organizer-edit-error" role="alert"></p>
     <div class="organizer-actions"><button class="primary" type="submit">Save changes</button><button class="danger" id="organizer-remove" type="button">Remove from map</button></div>
   </form>` : '';
-  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
+  $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
   $('#detail').hidden = false;
+  if(!demo){
+    renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db));
+    if(isOrganizer||stop.created_by===currentUserId)renderPhotoReview($('#photo-review'),stop,isOrganizer?adminDb:db,isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
+  }else if(stop.photo_previews?.length){
+    const gallery=$('#sale-photo-gallery');gallery.hidden=false;const grid=document.createElement('div');grid.className='sale-photo-grid';
+    for(const url of stop.photo_previews){const img=document.createElement('img');img.src=url;img.alt='Sample sale photo';grid.append(img);}gallery.append(grid);
+    $('#photo-review').textContent='Preview only. Real submitted photos stay private until organizer approval.';
+  }
+  if($('#retry-photos'))$('#retry-photos').onclick=async()=>{
+    const button=$('#retry-photos');button.disabled=true;
+    try{await uploadSalePhotos(isOrganizer?adminDb:db,id,photoRetries.get(id),message=>button.textContent=message);photoRetries.delete(id);await loadStops();showDetail(id,false);toast('Photos submitted for organizer approval.');}
+    catch{button.disabled=false;button.textContent='Retry photo upload';toast('Your sale is saved. Photos could not upload; please retry.');}
+  };
   $('.close-detail').onclick = () => { closeDetail(); render(); };
   $('#directions-stop').onclick = () => openDirections(stop);
   $('#share-stop').onclick = () => share(id);
@@ -1015,6 +1050,7 @@ function showDetail(id, pan = true) {
   if ($('#organizer-remove')) $('#organizer-remove').onclick = async () => {
     if (!confirm(`Remove ${stop.address} from the Yard Sale map?`)) return;
     $('#organizer-remove').disabled = true;
+    try{await removeSalePhotos(adminDb,id);}catch{toast('Could not remove the photos. Please retry.');$('#organizer-remove').disabled=false;return;}
     const { error } = await adminDb.from('yard_sales').delete().eq('id', id);
     if (error) { toast('Could not remove the home. Please sign in again and retry.'); $('#organizer-remove').disabled = false; return; }
     stops = stops.filter((item) => item.id !== id);
@@ -1026,6 +1062,7 @@ function showDetail(id, pan = true) {
   if ($('#remove-stop')) $('#remove-stop').onclick = async () => {
     if (!confirm('Remove your house from the neighborhood map?')) return;
     $('#remove-stop').disabled = true;
+    try{await removeSalePhotos(db,id);}catch{toast('Could not remove the photos. Please retry.');$('#remove-stop').disabled=false;return;}
     const { error } = await db.from('yard_sales').delete().eq('id', id);
     if (error) { toast('Could not remove the house. Please try again.'); $('#remove-stop').disabled = false; return; }
     closeDetail();
@@ -1157,6 +1194,8 @@ $('#organizer-logout').onclick = async () => {
 };
 $('#notification-toggle').onclick = togglePushNotifications;
 $('#organizer-export').onclick = exportHomeList;
+$('#organizer-photo-reviews').onclick=()=>openPhotoInbox($('#photo-reviews-dialog'),$('#photo-reviews-list'),adminDb,id=>showDetail(id));
+$('#close-photo-reviews').onclick=()=>$('#photo-reviews-dialog').close();
 
 let directionsAddress = '';
 function openDirections(stop) {
@@ -1282,11 +1321,14 @@ $('#confirm-location').onclick = () => {
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && document.body.classList.contains('picking')) endPicking(); });
 function inNeighborhood(lat, lng) { return Number.isFinite(lat) && Number.isFinite(lng) && lat >= 33.23 && lat <= 33.27 && lng >= -96.925 && lng <= -96.88; }
 
+const photoPicker=setupPhotoPicker($('#sale-photos'),$('#photo-previews'),$('#photo-status'));
 $('#stop-form').onsubmit = async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
   const errorElement = $('#form-error');
   errorElement.textContent = '';
+  if(photoPicker.busy){errorElement.textContent='Please wait while your photos finish preparing.';return;}
+  const selectedPhotos=photoPicker.files;
   if (submissionsClosed()) { errorElement.textContent = 'Yard Sale home submissions are closed for this event.'; return; }
   const selectedCategories = [...new Set(form.getAll('categories'))];
   if (!selectedCategories.length) { errorElement.textContent = 'Choose at least one item category.'; return; }
@@ -1303,16 +1345,22 @@ $('#stop-form').onsubmit = async (event) => {
   $('#save-stop').disabled = true;
   try {
     let id;
-    if (demo) { id = crypto.randomUUID(); stops.push({ ...stop, id }); }
+    let photoUploadFailed=false;
+    if (demo) { id = crypto.randomUUID(); stops.push({ ...stop, id,photo_previews:selectedPhotos.map(blob=>URL.createObjectURL(blob)) }); }
     else {
       if (!isOrganizer) await ensureVisitorSession();
       const { data, error } = await (isOrganizer ? adminDb : db).from('yard_sales').insert(stop).select().single();
       if (error) throw error;
       id = data.id;
+      if(selectedPhotos.length){
+        try{await uploadSalePhotos(isOrganizer?adminDb:db,id,selectedPhotos,message=>$('#photo-status').textContent=message);}
+        catch{photoUploadFailed=true;photoRetries.set(id,selectedPhotos);}
+      }
       await loadStops();
     }
     dialog.close();
     event.target.reset();
+    photoPicker.reset();
     chosenLocation = null;
     chosenAddressKey = '';
     if (searchMarker) {
@@ -1330,8 +1378,9 @@ $('#stop-form').onsubmit = async (event) => {
     hideSearchResults();
     syncFilters();
     render();
-    if (demo) showDetail(id);
-    toast(demo ? 'Sample house added for this preview session.' : 'Your sale is now on the ArrowBrooke map!');
+    if(demo||selectedPhotos.length)showDetail(id);
+    refreshPhotoReviewCount();
+    toast(demo?'Sample sale added for this preview session.':photoUploadFailed?'Your sale is saved. Use Retry photo upload to send your photos.':selectedPhotos.length?'Your sale is on the map. Photos are awaiting organizer approval.':'Your sale is now on the ArrowBrooke map!');
   } catch (error) {
     if (error?.code === '23505') errorElement.textContent = 'That home is already listed for this event.';
     else if (error?.code === '23514') errorElement.textContent = 'Choose your exact home from the verified ArrowBrooke address list.';

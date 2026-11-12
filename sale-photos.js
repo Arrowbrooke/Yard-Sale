@@ -1,0 +1,136 @@
+const BUCKET='yard-sale-photos';
+const MAX_PHOTOS=5;
+
+export function setupPhotoPicker(input,preview,status) {
+  let photos=[];
+  let busy=false;
+  const render=()=>{
+    preview.replaceChildren();
+    photos.forEach((photo,index)=>{
+      const tile=document.createElement('div');tile.className='photo-preview';
+      const img=document.createElement('img');img.src=photo.url;img.alt=`Selected photo ${index+1}`;
+      const button=document.createElement('button');button.type='button';button.textContent='×';button.setAttribute('aria-label',`Remove photo ${index+1}`);
+      button.onclick=()=>{URL.revokeObjectURL(photos[index].url);photos.splice(index,1);render();};
+      tile.append(img,button);preview.append(tile);
+    });
+    status.textContent=photos.length?`${photos.length} of 5 photos selected. Photos appear only after organizer approval.`:'Take photos or choose from your library. Up to 5; organizer approval required.';
+  };
+  input.addEventListener('change',async()=>{
+    const files=Array.from(input.files||[]);input.value='';
+    if(photos.length+files.length>MAX_PHOTOS){status.textContent='Choose no more than 5 photos in total. Remove a preview to make room.';return;}
+    busy=true;input.disabled=true;status.textContent='Preparing photos…';
+    try{
+      for(const file of files){
+        if(!file.type.startsWith('image/')||file.size>25*1024*1024)throw new Error('Choose an image smaller than 25 MB.');
+        const blob=await compressPhoto(file);
+        photos.push({blob,url:URL.createObjectURL(blob)});
+      }
+      render();
+    }catch(error){render();status.textContent=error.message||'Could not open that photo. Try a JPEG or PNG, or take a new photo.';}
+    finally{busy=false;input.disabled=false;}
+  });
+  render();
+  return {get files(){return photos.map(p=>p.blob);},get busy(){return busy;},reset(){photos.forEach(p=>URL.revokeObjectURL(p.url));photos=[];render();}};
+}
+
+async function compressPhoto(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const image=new Image();image.src=url;await image.decode();
+    const scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+    for(const quality of [.8,.65,.5,.35]){
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+      if(blob&&blob.size<=1048576)return blob;
+    }
+    throw new Error('That photo is too detailed to upload. Try a smaller photo.');
+  }finally{URL.revokeObjectURL(url);}
+}
+
+export async function uploadSalePhotos(client,saleId,files,onProgress=()=>{}){
+  if(files.length>5)throw new Error('A sale can have up to five photos.');
+  const paths=[];
+  try{
+    for(let index=0;index<files.length;index++){
+      onProgress(`Uploading photo ${index+1} of ${files.length}…`);
+      const name=`${saleId}/${crypto.randomUUID()}.jpg`;
+      const {error}=await client.storage.from(BUCKET).upload(name,files[index],{contentType:'image/jpeg',cacheControl:'3600',upsert:false});
+      if(error)throw error;paths.push(name);
+    }
+    if(paths.length){const {error}=await client.rpc('submit_sale_photos',{target_sale:saleId,paths});if(error)throw error;}
+    return paths.length;
+  }catch(error){
+    // Reconcile a network failure after submission before removing uploaded files.
+    const {data:review,error:lookupError}=await client.from('sale_photo_reviews').select('photo_paths').eq('sale_id',saleId).maybeSingle();
+    if(review&&paths.every(path=>review.photo_paths.includes(path)))return paths.length;
+    if(paths.length&&!lookupError)await client.storage.from(BUCKET).remove(paths);
+    throw error;
+  }
+}
+
+async function makeGallery(container,client,paths,label){
+  if(!container.isConnected||!paths?.length)return;
+  const {data,error}=await client.storage.from(BUCKET).createSignedUrls(paths,3600);
+  if(!container.isConnected)return;
+  if(error){container.textContent='Photos could not load. Please try again.';return;}
+  const grid=document.createElement('div');grid.className='sale-photo-grid';
+  for(const [index,item] of (data||[]).entries()){
+    if(!item.signedUrl)continue;
+    const link=document.createElement('a');link.href=item.signedUrl;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',`${label} ${index+1}, open full photo`);
+    const img=document.createElement('img');img.src=item.signedUrl;img.alt=`${label} ${index+1}`;img.loading='lazy';link.append(img);grid.append(link);
+  }
+  container.replaceChildren(grid);
+}
+
+export async function renderSalePhotos(container,stop,client){
+  if(!stop.photo_paths?.length||!client)return;
+  container.hidden=false;
+  await makeGallery(container,client,stop.photo_paths,'Sale photo');
+}
+
+export async function renderPhotoReview(container,stop,client,isOrganizer,onChange){
+  if(!client||!container)return;
+  const {data:review,error}=await client.from('sale_photo_reviews').select('*').eq('sale_id',stop.id).maybeSingle();
+  if(!container.isConnected||error||!review)return;
+  if(!isOrganizer){container.textContent=review.status==='pending'?'Your photos are awaiting organizer approval.':review.status==='rejected'?'Your photos were not approved for the public map.':'';return;}
+  if(review.status!=='pending')return;
+  const heading=document.createElement('h3');heading.textContent='Photos awaiting your approval';
+  const note=document.createElement('p');note.textContent='These photos are private. Approve them to show them on the public listing.';
+  const gallery=document.createElement('div');
+  const actions=document.createElement('div');actions.className='detail-actions';
+  const approve=document.createElement('button');approve.type='button';approve.className='primary';approve.textContent='Approve photos';
+  const reject=document.createElement('button');reject.type='button';reject.className='secondary';reject.textContent='Reject photos';
+  const status=document.createElement('p');status.setAttribute('role','status');
+  actions.append(approve,reject);container.replaceChildren(heading,note,gallery,actions,status);
+  await makeGallery(gallery,client,review.photo_paths,'Private review photo');
+  const decide=async decision=>{
+    approve.disabled=true;reject.disabled=true;status.textContent='Saving your decision…';
+    const {error}=await client.rpc('review_sale_photos',{target_review:review.id,decision});
+    if(error){status.textContent='Could not save your decision. Please sign in again and retry.';approve.disabled=false;reject.disabled=false;return;}
+    if(decision==='rejected')await client.storage.from(BUCKET).remove(review.photo_paths);
+    await onChange();
+  };
+  approve.onclick=()=>decide('approved');reject.onclick=()=>decide('rejected');
+}
+
+export async function removeSalePhotos(client,saleId){
+  const {data,error}=await client.storage.from(BUCKET).list(saleId,{limit:20});
+  if(error)throw error;
+  const paths=(data||[]).filter(item=>item.id).map(item=>`${saleId}/${item.name}`);
+  if(paths.length){const {error}=await client.storage.from(BUCKET).remove(paths);if(error)throw error;}
+}
+
+export async function photoReviewCount(client){
+  const {count,error}=await client.from('sale_photo_reviews').select('id',{count:'exact',head:true}).eq('status','pending');
+  if(error)throw error;return count||0;
+}
+
+export async function openPhotoInbox(dialog,list,client,onSelect){
+  list.textContent='Loading photo reviews…';dialog.showModal();
+  const {data,error}=await client.from('sale_photo_reviews').select('id,sale_id,address,photo_paths').eq('status','pending').order('created_at');
+  if(error){list.textContent='Could not load reviews. Please sign in again and retry.';return;}
+  list.replaceChildren();
+  if(!data?.length){list.textContent='All caught up. No photos are waiting for approval.';return;}
+  for(const review of data){const button=document.createElement('button');button.type='button';button.className='secondary photo-inbox-row';button.textContent=`${review.address} · ${review.photo_paths.length} photos`;button.onclick=()=>{dialog.close();onSelect(review.sale_id);};list.append(button);}
+}
