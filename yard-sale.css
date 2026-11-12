@@ -31,3 +31,5 @@ form input:not([type=checkbox]),textarea{background:#fffdf7;border-color:#e1d4bd
 .bottom-nav .nav-active{color:#a65332}.sheet-handle span{background:#c1a686}.organizer-tools,.organizer-edit{background:#f5eddf;border-color:#e1d4bd}.location-icon-option{background:#f5eddf;border-color:#e1d4bd}.location-icon-option[aria-pressed=true]{background:#f4e1c5;border-color:#a65332}
 .season-note{margin:8px 0 18px;color:#997c56;font-size:10px;letter-spacing:.6px}
 @media(max-width:700px){.explore{background-color:#fffaf0}.season-note{display:none}}
+.approval-note strong{color:#805034}.bottom-nav .nav-active span{background:#f1ddbf}.leaflet-control-attribution{background:#fffaf0ed!important;color:#7b6c57!important}.leaflet-control-attribution a{color:#8d4b31!important}
+@media(min-width:701px){.filters{max-width:calc(100vw - 450px)}}
