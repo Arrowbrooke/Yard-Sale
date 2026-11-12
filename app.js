@@ -3,7 +3,7 @@ import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js'
 import { pickStopName } from './stop-names.js?v=20261028-many-names';
 import { lookupAddress } from './address-lookup.js';
 import { applyAddressCorrections } from './address-corrections.js?v=20261028-address-precision-v4';
-import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=fall-photos-1';
+import {setupPhotoPicker,uploadSalePhotos,renderSalePhotos,renderPhotoReview,removeSalePhotos,photoReviewCount,openPhotoInbox} from './sale-photos.js?v=individual-photos-2';
 
 const $ = (selector) => document.querySelector(selector);
 const config = window.YARD_SALE_CONFIG;
@@ -1014,7 +1014,7 @@ function showDetail(id, pan = true) {
   $('#detail').innerHTML = `<button class="icon-button close-detail" aria-label="Close details">×</button><div class="eyebrow">${isOrganizer ? 'ORGANIZER MODE · ' : ''}${demo ? 'SAMPLE STOP · ' : ''}SATURDAY · NOVEMBER 14</div><h2>${escapeHtml(stop.title)}</h2><div class="detail-tags">${stop.categories.map((key) => `<span class="tag">${categories[key].icon} ${categories[key].label}</span>`).join('')}</div><p>⌖ ${escapeHtml(stop.address)}</p><p class="sale-hours">◷ ${escapeHtml(saleHours(stop))} · Saturday, Nov 14</p>${stop.notes ? `<p>${escapeHtml(stop.notes)}</p>` : ''}<section id="sale-photo-gallery" aria-label="Sale photos" hidden></section><section id="photo-review" class="private-photo-review" aria-live="polite"></section>${photoRetries.has(id)?'<button id="retry-photos" class="secondary">Retry photo upload</button>':''}${organizerEditor}<div class="detail-actions"><button class="secondary" id="directions-stop">↗ Directions</button><button class="primary" id="share-stop">Share stop</button></div>${!isOrganizer && db && stop.created_by === currentUserId ? '<button class="secondary" id="remove-stop" style="width:100%;margin-top:10px">Remove my house</button>' : ''}`;
   $('#detail').hidden = false;
   if(!demo){
-    renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db));
+    renderSalePhotos($('#sale-photo-gallery'),stop,isOrganizer?adminDb:(publicDb||db),isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
     if(isOrganizer||stop.created_by===currentUserId)renderPhotoReview($('#photo-review'),stop,isOrganizer?adminDb:db,isOrganizer,async()=>{await loadStops();refreshPhotoReviewCount();showDetail(id,false);});
   }else if(stop.photo_previews?.length){
     const gallery=$('#sale-photo-gallery');gallery.hidden=false;const grid=document.createElement('div');grid.className='sale-photo-grid';

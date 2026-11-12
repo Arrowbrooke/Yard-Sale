@@ -13,3 +13,5 @@ Run `yard-sale-photos.sql` once after the initial schema, then `yard-sale-notifi
 On iPhone, open the Yard Sale URL in Safari and add it to the Home Screen. Launch that installed app, sign in as organizer, and enable iPhone alerts. The organizer login persists on that device until sign-out or site data is cleared. The app uses an autumn leaf icon.
 
 Map data: OpenFreeMap / OpenStreetMap; addresses: OpenAddresses / Denton County; supplemental buildings: Overture Maps (ODbL), including approximate display footprints where original data has none. See the source Halloween repository for preparation scripts.
+
+Individual moderation: run yard-sale-photo-moderation.sql once after the photo schema. Each submission supports Select all, Approve selected and Deny selected. Approvals update only selected photos. Deny and Remove delete the files through the Storage API before completing the database change, so failed deletions remain retryable.

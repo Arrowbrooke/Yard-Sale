@@ -69,24 +69,39 @@ export async function uploadSalePhotos(client,saleId,files,onProgress=()=>{}){
   }
 }
 
-async function makeGallery(container,client,paths,label){
+async function makeGallery(container,client,paths,label,addControls){
   if(!container.isConnected||!paths?.length)return;
   const {data,error}=await client.storage.from(BUCKET).createSignedUrls(paths,3600);
   if(!container.isConnected)return;
   if(error){container.textContent='Photos could not load. Please try again.';return;}
   const grid=document.createElement('div');grid.className='sale-photo-grid';
   for(const [index,item] of (data||[]).entries()){
-    if(!item.signedUrl)continue;
-    const link=document.createElement('a');link.href=item.signedUrl;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',`${label} ${index+1}, open full photo`);
-    const img=document.createElement('img');img.src=item.signedUrl;img.alt=`${label} ${index+1}`;img.loading='lazy';link.append(img);grid.append(link);
+    const tile=document.createElement('div');tile.className='sale-photo-tile';
+    if(item.signedUrl){
+      const link=document.createElement('a');link.href=item.signedUrl;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',`${label} ${index+1}, open full photo`);
+      const img=document.createElement('img');img.src=item.signedUrl;img.alt=`${label} ${index+1}`;img.loading='lazy';link.append(img);tile.append(link);
+    }else{const note=document.createElement('p');note.textContent='Photo unavailable';tile.append(note);}
+    addControls?.(paths[index],tile,index);grid.append(tile);
   }
   container.replaceChildren(grid);
 }
 
-export async function renderSalePhotos(container,stop,client){
+export async function renderSalePhotos(container,stop,client,isOrganizer=false,onChange=()=>{}){
   if(!stop.photo_paths?.length||!client)return;
   container.hidden=false;
-  await makeGallery(container,client,stop.photo_paths,'Sale photo');
+  await makeGallery(container,client,stop.photo_paths,'Sale photo',isOrganizer?(path,tile,index)=>{
+    const button=document.createElement('button');button.type='button';button.className='secondary remove-approved-photo';button.textContent='Remove photo';button.setAttribute('aria-label',`Remove approved photo ${index+1}`);
+    const status=document.createElement('p');status.className='photo-action-status';status.setAttribute('role','status');tile.append(button,status);
+    button.onclick=async()=>{
+      if(!confirm('Remove this photo from the listing and permanently delete its stored file?'))return;
+      button.disabled=true;status.textContent='Removing photo…';
+      const {error:deleteError}=await client.storage.from(BUCKET).remove([path]);
+      if(deleteError){status.textContent='Could not delete the photo. Please retry.';button.disabled=false;return;}
+      const {error}=await client.rpc('remove_sale_photo',{target_sale:stop.id,target_path:path});
+      if(error){status.textContent='The file was deleted. Retry to finish updating the listing.';button.disabled=false;return;}
+      await onChange();
+    };
+  }:undefined);
 }
 
 export async function renderPhotoReview(container,stop,client,isOrganizer,onChange){
@@ -94,21 +109,36 @@ export async function renderPhotoReview(container,stop,client,isOrganizer,onChan
   const {data:review,error}=await client.from('sale_photo_reviews').select('*').eq('sale_id',stop.id).maybeSingle();
   if(!container.isConnected||error||!review)return;
   if(!isOrganizer){container.textContent=review.status==='pending'?'Your photos are awaiting organizer approval.':review.status==='rejected'?'Your photos were not approved for the public map.':'';return;}
-  if(review.status!=='pending')return;
+  const pending=review.photo_paths.filter(path=>!(review.approved_paths||[]).includes(path)&&!(review.rejected_paths||[]).includes(path));
+  if(!pending.length)return;
   const heading=document.createElement('h3');heading.textContent='Photos awaiting your approval';
-  const note=document.createElement('p');note.textContent='These photos are private. Approve them to show them on the public listing.';
+  const note=document.createElement('p');note.textContent='Select the photos to approve or deny. Denied photos are deleted from storage.';
+  const selectAllLabel=document.createElement('label');selectAllLabel.className='photo-select-all';
+  const selectAll=document.createElement('input');selectAll.type='checkbox';selectAllLabel.append(selectAll,document.createTextNode(' Select all photos'));
   const gallery=document.createElement('div');
   const actions=document.createElement('div');actions.className='detail-actions';
-  const approve=document.createElement('button');approve.type='button';approve.className='primary';approve.textContent='Approve photos';
-  const reject=document.createElement('button');reject.type='button';reject.className='secondary';reject.textContent='Reject photos';
+  const approve=document.createElement('button');approve.type='button';approve.className='primary';approve.textContent='Approve selected';
+  const reject=document.createElement('button');reject.type='button';reject.className='secondary';reject.textContent='Deny selected';
   const status=document.createElement('p');status.setAttribute('role','status');
-  actions.append(approve,reject);container.replaceChildren(heading,note,gallery,actions,status);
-  await makeGallery(gallery,client,review.photo_paths,'Private review photo');
+  const selected=new Set();const boxes=[];
+  const sync=()=>{approve.disabled=reject.disabled=!selected.size;selectAll.checked=selected.size===pending.length;selectAll.indeterminate=selected.size>0&&selected.size<pending.length;status.textContent=`${selected.size} of ${pending.length} selected`;};
+  actions.append(approve,reject);container.replaceChildren(heading,note,selectAllLabel,gallery,actions,status);
+  await makeGallery(gallery,client,pending,'Private review photo',(path,tile,index)=>{
+    const label=document.createElement('label');label.className='photo-select-label';const box=document.createElement('input');box.type='checkbox';box.setAttribute('aria-label',`Select photo ${index+1}`);
+    box.onchange=()=>{if(box.checked)selected.add(path);else selected.delete(path);sync();};boxes.push({box,path});label.append(box,document.createTextNode(` Photo ${index+1}`));tile.append(label);
+  });
+  selectAll.onchange=()=>{for(const {box,path} of boxes){box.checked=selectAll.checked;if(selectAll.checked)selected.add(path);else selected.delete(path);}sync();};
+  sync();
   const decide=async decision=>{
+    if(!selected.size)return;
     approve.disabled=true;reject.disabled=true;status.textContent='Saving your decision…';
-    const {error}=await client.rpc('review_sale_photos',{target_review:review.id,decision});
+    const paths=Array.from(selected);
+    if(decision==='rejected'){
+      const {error}=await client.storage.from(BUCKET).remove(paths);
+      if(error){status.textContent='Could not delete the selected photos. Nothing was denied; please retry.';approve.disabled=false;reject.disabled=false;return;}
+    }
+    const {error}=await client.rpc('review_selected_sale_photos',{target_review:review.id,paths,decision});
     if(error){status.textContent='Could not save your decision. Please sign in again and retry.';approve.disabled=false;reject.disabled=false;return;}
-    if(decision==='rejected')await client.storage.from(BUCKET).remove(review.photo_paths);
     await onChange();
   };
   approve.onclick=()=>decide('approved');reject.onclick=()=>decide('rejected');
@@ -132,5 +162,5 @@ export async function openPhotoInbox(dialog,list,client,onSelect){
   if(error){list.textContent='Could not load reviews. Please sign in again and retry.';return;}
   list.replaceChildren();
   if(!data?.length){list.textContent='All caught up. No photos are waiting for approval.';return;}
-  for(const review of data){const button=document.createElement('button');button.type='button';button.className='secondary photo-inbox-row';button.textContent=`${review.address} · ${review.photo_paths.length} photos`;button.onclick=()=>{dialog.close();onSelect(review.sale_id);};list.append(button);}
+  for(const review of data){const button=document.createElement('button');button.type='button';button.className='secondary photo-inbox-row';button.textContent=`${review.address} · review photos`;button.onclick=()=>{dialog.close();onSelect(review.sale_id);};list.append(button);}
 }
