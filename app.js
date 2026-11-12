@@ -847,6 +847,12 @@ function selectSearchResult(result) {
   hideSearchResults();
   closeDetail();
   render();
+  const existingSale=result.isHouse?stops.find(stop=>normalizeAddressText(stop.address)===normalizeAddressText(result.title)):null;
+  if(existingSale){
+    filter.clear();syncFilters();render();showDetail(existingSale.id);
+    toast('Sale found. Tap Add photos to this sale to upload pictures.');
+    return;
+  }
   if (searchMarker) searchMarker.remove();
   searchMarker = L.marker([result.lat, result.lng], {
     icon: L.divIcon({ className: 'search-location', iconSize: [20, 20], iconAnchor: [10, 10], html: '<span></span>' }),
@@ -1447,7 +1453,7 @@ $('#stop-form').onsubmit = async (event) => {
     refreshPhotoReviewCount();
     toast(demo?'Sample sale added for this preview session.':photoUploadFailed?'Your sale is saved. Use Retry photo upload to send your photos.':selectedPhotos.length?'Your sale is on the map. Photos are awaiting organizer approval.':'Your sale is now on the ArrowBrooke map!');
   } catch (error) {
-    if (error?.code === '23505') errorElement.textContent = 'That home is already listed for this event.';
+    if (error?.code === '23505') errorElement.textContent = 'That home is already listed. Open it on the map and tap Add photos to this sale.';
     else if (error?.code === '23514') errorElement.textContent = 'Choose your exact home from the verified ArrowBrooke address list.';
     else if (error?.code === '22023') errorElement.textContent = 'Yard Sale home submissions are closed for this event.';
     else errorElement.textContent = 'Could not save your house. Check your connection and try again.';
