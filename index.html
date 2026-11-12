@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#a65332">
+  <meta name="description" content="Find participating Yard Sale homes around ArrowBrooke.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ArrowBrooke Yard Sale">
+  <title>ArrowBrooke Yard Sale · November 14</title>
+  <link rel="icon" href="icon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css?v=yard-sale-1">
+  <link rel="stylesheet" href="yard-sale.css?v=1">
+</head>
+<body>
+  <main>
+    <div id="map" aria-label="Yard Sale map of ArrowBrooke"></div>
+
+    <header class="search-panel">
+      <div class="search-box">
+        <span class="pumpkin" aria-hidden="true">🏷️</span>
+        <input id="search" type="search" placeholder="Search an address or street" aria-label="Search addresses, streets, and yard sales" autocomplete="street-address" aria-controls="search-results" aria-expanded="false">
+        <button id="share" class="icon-button" aria-label="Share map" title="Share map">↗</button>
+      </div>
+      <div id="search-results" class="search-results" role="listbox" aria-label="Address search results" hidden></div>
+      <div class="filters" aria-label="Filter sales by items"><button class="chip active" data-category="all" aria-pressed="true">All sales</button><button class="chip" data-category="mens" aria-pressed="false">👔 Men's Clothes</button><button class="chip" data-category="womens" aria-pressed="false">👗 Women's Clothes</button><button class="chip" data-category="kids" aria-pressed="false">👕 Kids' Clothes</button><button class="chip" data-category="toys" aria-pressed="false">🧸 Toys</button><button class="chip" data-category="electronics" aria-pressed="false">🔌 Electronics</button><button class="chip" data-category="household" aria-pressed="false">🏠 Home Goods</button><button class="chip" data-category="furniture" aria-pressed="false">🪑 Furniture</button><button class="chip" data-category="tools" aria-pressed="false">🛠️ Tools & Outdoors</button><button class="chip" data-category="books" aria-pressed="false">📚 Books & Games</button><button class="chip" data-category="other" aria-pressed="false">🏷️ Other</button></div>
+    </header>
+
+    <aside class="explore">
+      <button class="sheet-handle" id="sheet-toggle" aria-label="Expand stop list" aria-expanded="false"><span></span></button>
+      <div class="eyebrow">SATURDAY, NOVEMBER 14 · ARROWBROOKE</div>
+      <div class="title-row">
+        <h1><span class="desktop-title">Good neighbors.<br>Great finds.</span><span class="phone-title">ArrowBrooke Yard Sale</span></h1>
+        <span class="ghost" aria-hidden="true">🍂</span>
+      </div>
+      <p class="intro">A neighborhood full of secondhand treasures. Find a sale, plan your stops, and shop local.</p>
+      <p class="season-note">FALL FINDS · FRESH STARTS · A LITTLE LESS CLUTTER</p><div class="connection" id="connection" role="status">Connecting to the neighborhood…</div>
+      <div class="list-heading public-list-heading">
+        <h2>Explore yard sales</h2>
+        <span id="count">0 stops</span>
+      </div>
+      <div id="stop-list"></div>
+      <p class="local-note">Tap a home for details and walking directions.</p>
+      <div id="organizer-tools" class="organizer-tools" hidden>
+        <strong>Organizer mode</strong>
+        <span>Select a listed home on the map to edit it.</span>
+        <div class="notification-controls">
+          <span id="notification-status">Checking iPhone notifications…</span>
+          <button id="notification-toggle" class="secondary" type="button">Turn on iPhone alerts</button>
+        </div>
+        <div class="export-controls">
+          <span id="export-status">Download a backup of the current home list.</span>
+          <button id="organizer-export" class="secondary" type="button">Export home list (CSV)</button>
+        </div>
+        <button id="organizer-messages" class="secondary" type="button">View map messages</button>
+        <button id="organizer-logout" class="secondary" type="button">Sign out</button>
+      </div>
+      <button id="organizer-login" class="organizer-link" type="button">Organizer login</button>
+    </aside>
+
+    <div class="map-controls">
+      <button id="help" class="map-button" aria-label="Message the developer or suggest a correction" title="Message the developer">?</button>
+      <button id="home" class="map-button" aria-label="Back to ArrowBrooke" title="Back to ArrowBrooke">⌂</button>
+      <button id="locate" class="map-button" aria-label="Show my location" title="My location">◎</button>
+      <button id="zoom-in" class="map-button" aria-label="Zoom in">+</button>
+      <button id="zoom-out" class="map-button" aria-label="Zoom out">−</button>
+    </div>
+
+    <div id="place-hint" hidden>Move the map, then tap “Use this spot”</div>
+    <div id="crosshair" hidden aria-hidden="true">+</div>
+    <button id="confirm-location" class="primary location-confirm" hidden>Use this spot</button>
+    <button id="add" class="add-button"><span>＋</span> Add my sale</button>
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button id="explore-tab" class="nav-active"><span>⌖</span>Explore</button>
+      <button id="add-tab"><span>⊕</span>Add my sale</button>
+    </nav>
+    <section id="detail" class="detail" hidden aria-label="Stop details"></section>
+  </main>
+
+  <dialog id="add-dialog">
+    <form id="stop-form">
+      <div class="dialog-top">
+        <div><div class="eyebrow">JOIN THE YARD SALE MAP</div><h2>Add your sale 🏷️</h2></div>
+        <button type="button" class="icon-button close-dialog" aria-label="Close">×</button>
+      </div>
+      <p class="muted">Join the neighborhood yard sale on Saturday, November 14.</p>
+      <div class="approval-note"><strong>One listing is allowed per home.</strong><br>Your verified ArrowBrooke address will appear on the map as soon as you submit it.</div>
+      <button type="button" id="pick-location" class="secondary">⌖ Choose location on map</button>
+      <p id="location-label" class="muted">Pick your house first; we’ll suggest its address.</p>
+      <label>Display name <span class="optional-label">optional</span>
+        <input name="title" maxlength="80" placeholder="Example: Furniture & family finds" aria-describedby="name-help">
+      </label>
+      <p id="name-help" class="field-help">Leave this blank to use “Yard sale at” your address.</p>
+      <label>Street address
+        <input name="address" maxlength="140" placeholder="Start typing your house address" aria-describedby="address-help address-options" autocomplete="street-address" required>
+      </label>
+      <div id="address-options" class="form-address-options" role="listbox" aria-label="Matching ArrowBrooke addresses" hidden></div>
+      <p id="address-help" class="field-help" role="status">Choose a spot on the map, or type the address yourself.</p>
+      <p class="lookup-credit">Neighborhood addresses: <a href="https://openaddresses.io/" target="_blank" rel="noopener noreferrer">OpenAddresses</a> / Denton County</p>
+      <fieldset>
+        <legend>What are you selling? <span class="muted">Choose all that apply</span></legend>
+        <div class="category-options"><label><input name="categories" type="checkbox" value="mens"><span>👔 Men's Clothes</span></label><label><input name="categories" type="checkbox" value="womens"><span>👗 Women's Clothes</span></label><label><input name="categories" type="checkbox" value="kids"><span>👕 Kids' Clothes</span></label><label><input name="categories" type="checkbox" value="toys"><span>🧸 Toys</span></label><label><input name="categories" type="checkbox" value="electronics"><span>🔌 Electronics</span></label><label><input name="categories" type="checkbox" value="household"><span>🏠 Home Goods</span></label><label><input name="categories" type="checkbox" value="furniture"><span>🪑 Furniture</span></label><label><input name="categories" type="checkbox" value="tools"><span>🛠️ Tools & Outdoors</span></label><label><input name="categories" type="checkbox" value="books"><span>📚 Books & Games</span></label><label><input name="categories" type="checkbox" value="other"><span>🏷️ Other</span></label></div>
+      </fieldset>
+      <div class="two-col"><label>Start time (Central)<input name="starts" type="time" required></label><label>End time (Central)<input name="ends" type="time" required></label></div><label>Good to know
+        <textarea name="notes" maxlength="400" rows="2" placeholder="Describe your items, sizes, payment options, or anything shoppers should know."></textarea>
+      </label>
+      <p id="form-error" class="error" role="alert"></p>
+      <button type="submit" id="save-stop" class="primary">Add my sale</button>
+      <p class="fine-print">Only submit a home you are authorized to list. The address and notes will be public to anyone with the map link.</p>
+    </form>
+  </dialog>
+
+  <dialog id="location-dialog">
+    <div class="dialog-top">
+      <div><div class="eyebrow">LIVE MAP COMPANION</div><h2>Choose your map icon</h2></div>
+      <button type="button" class="icon-button close-location" aria-label="Close">×</button>
+    </div>
+    <p class="muted">Your location stays private on this device and updates only while the map is open.</p>
+    <div class="location-icon-options" role="radiogroup" aria-label="Location icon"><button class="location-icon-option" type="button" data-location-icon="📍" aria-pressed="true"><span>📍</span>Pin</button><button class="location-icon-option" type="button" data-location-icon="🛍️" aria-pressed="false"><span>🛍️</span>Shopping</button><button class="location-icon-option" type="button" data-location-icon="🚶" aria-pressed="false"><span>🚶</span>Walking</button><button class="location-icon-option" type="button" data-location-icon="🏷️" aria-pressed="false"><span>🏷️</span>Bargains</button></div><p id="location-status" class="muted" role="status">Choose an icon, then allow location access.</p>
+    <div class="location-sharing-actions">
+      <button id="start-location" class="primary" type="button">Show my live location</button>
+      <button id="stop-location" class="secondary" type="button" hidden>Stop sharing location</button>
+    </div>
+  </dialog>
+
+  <dialog id="organizer-dialog">
+    <form id="organizer-form">
+      <div class="dialog-top">
+        <div><div class="eyebrow">PRIVATE MAP CONTROLS</div><h2>Organizer login 🏷️</h2></div>
+        <button type="button" class="icon-button close-organizer" aria-label="Close">×</button>
+      </div>
+      <p class="muted">Enter the organizer password to edit yard sales directly from the map.</p>
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p id="organizer-error" class="error" role="alert"></p>
+      <button id="organizer-submit" class="primary" type="submit">Enter organizer mode</button>
+      <p class="fine-print">The password is checked securely by Supabase and is never stored in this website.</p>
+    </form>
+  </dialog>
+
+  <dialog id="directions-dialog">
+    <div class="dialog-top">
+      <div><div class="eyebrow">CHOOSE YOUR MAP</div><h2>Get directions</h2></div>
+      <button type="button" class="icon-button close-directions" aria-label="Close">×</button>
+    </div>
+    <p id="directions-address" class="muted"></p>
+    <div class="directions-options">
+      <a id="apple-directions" class="secondary" target="_blank" rel="noopener noreferrer">Apple Maps <small>Driving</small></a>
+      <a id="google-directions" class="secondary" target="_blank" rel="noopener noreferrer">Google Maps <small>Driving</small></a>
+      <a id="waze-directions" class="secondary" target="_blank" rel="noopener noreferrer">Waze <small>Navigation</small></a>
+      <button id="copy-destination" class="secondary" type="button">Copy address</button>
+    </div>
+  </dialog>
+
+  <dialog id="message-dialog">
+    <form id="message-form">
+      <div class="dialog-top"><h2>Message the developer</h2><button id="close-message" type="button" class="icon-button" aria-label="Close message">×</button></div>
+      <p class="muted">Suggest a correction or tell us what needs updating. Include the house address if your message is about a home.</p>
+      <label>Your message<textarea name="message" rows="5" minlength="5" maxlength="400" placeholder="What would you like us to update?" required></textarea></label>
+      <p class="fine-print">Your message is visible only to the organizer.</p>
+      <p id="message-error" class="error" role="alert"></p>
+      <button id="send-message" class="primary" type="submit">Send message</button>
+    </form>
+  </dialog>
+  <dialog id="messages-dialog">
+    <div class="dialog-top"><h2>Map messages</h2><button id="close-messages" class="icon-button" type="button" aria-label="Close messages">×</button></div>
+    <div id="message-list" aria-live="polite"></div>
+    <button id="message-login" class="primary" type="button" hidden>Organizer login</button>
+  </dialog>
+  <div id="toast" role="status" hidden></div>
+  <script src="vendor/leaflet.js"></script>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="vendor/leaflet-maplibre-gl.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js?v=20261028-push-notifications"></script>
+  <script src="app.js?v=20261031-viewer-scaling" type="module"></script>
+
+</body>
+</html>

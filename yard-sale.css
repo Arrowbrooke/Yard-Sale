@@ -1,0 +1,33 @@
+:root{--blue:#377e68;--green:#377e68;--shadow:0 10px 36px #3149371a;color-scheme:light}
+body{background:#eee9dd;color:#263d32;font-family:Arial,sans-serif}#map{background:#eee9dd}
+.explore,.search-box,.search-results,.detail,dialog,.bottom-nav{background:#fffdf7;color:#263d32;border-color:#d8dfd2;box-shadow:var(--shadow)}
+.explore{border:1px solid #d8dfd2}.search-box input{color:#263d32}.search-box input::placeholder{color:#778278}
+h1,.detail h2,.dialog-top h2{font-family:Georgia,serif;font-weight:500;letter-spacing:-1px;color:#263d32}h1{font-size:38px;line-height:1.08}
+.eyebrow{color:#6e806f;font-weight:700;letter-spacing:1.1px}.ghost{font-size:35px}.intro{color:#718073;line-height:1.6}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:9px 0;scrollbar-width:thin;max-width:100%}.chip{flex-shrink:0;white-space:nowrap;background:#fffdf7;color:#526758;border:1px solid #ccd8ca;min-height:40px;font-size:11px;padding:9px 11px}
+.chip.active{background:#377e68;color:#fff;border-color:#377e68}.chip:hover{border-color:#377e68}
+.connection,.connection.live{background:#eaf0e5;color:#4a6c50;border:1px solid #dce6d5}.stop-row{background:transparent;color:#263d32;border-color:#e2e8dc}.stop-title{color:#263d32}.stop-address,.stop-badge,.stop-time{color:#70806f}.stop-time{font-weight:700;color:#377e68;margin-top:4px}.stop-icon{background:#f1ede0!important}
+.list-heading h2,.empty strong,.organizer-tools strong{color:#263d32}.empty,.local-note,.muted,.fine-print,.field-help,.lookup-credit,.optional-label{color:#768271}
+.detail p,.detail .sale-hours{color:#526758}.detail .sale-hours{font-weight:700;background:#edf2e8;padding:10px;border-radius:10px}.tag{background:#edf2e8;color:#3d624d}
+.primary,.add-button{background:#377e68;color:white;border-color:#377e68;box-shadow:none}.secondary{background:#edf2e8;border:1px solid #d1ddcc;color:#377e68}.icon-button{color:#526758;background:transparent}.map-button{background:#fffdf7;color:#377e68;border:1px solid #d8dfd2}
+form input:not([type=checkbox]),textarea{background:#fffefb;color:#263d32;border-color:#d0d9cb}.category-options span{background:#fffefb;border-color:#d0d9cb;color:#526758}.category-options input:checked+span{background:#e5efdf;color:#245c44;border-color:#377e68}.approval-note{background:#edf2e8;border-color:#d1ddcc;color:#526758}
+.form-address-options{background:#fffdf7;border-color:#d0d9cb}.form-address-option,.search-result{background:#fffdf7;color:#263d32;border-color:#e2e8dc}.form-address-option:hover,.form-address-option:focus-visible,.search-result:hover,.search-result:focus-visible{background:#edf2e8}.search-result small,.search-result-status{color:#768271}
+.organizer-tools,.organizer-edit{background:#f3f5ed;color:#526758;border-color:#d1ddcc}.organizer-link{color:#768271}.notification-controls{display:none!important}.bottom-nav button{color:#7c897b;background:transparent}.bottom-nav .nav-active{color:#377e68}.sheet-handle span{background:#a7b49e}.error{color:#a33232}.danger{background:#fbe9e4;color:#9a3c2d}
+.location-icon-option{background:#f4f5ed;color:#526758;border-color:#d1ddcc}.location-icon-option[aria-pressed=true]{background:#e5efdf;border-color:#377e68}.halloween-location-icon{background:#fffdf7;border-color:#377e68;animation:none;box-shadow:0 0 0 6px #377e6822}
+.house-number{color:#344e3c;text-shadow:0 0 3px #fff,0 0 3px #fff}.search-location span{border-color:#377e68;background:#377e6844;box-shadow:0 0 0 8px #377e6822}.notification-controls{display:none!important}
+@media(max-width:700px){h1{font-size:23px}.filters{display:flex;grid-template-columns:none;overflow-x:auto;gap:5px;padding:8px 0}.chip{font-size:11px;padding:9px 11px;min-height:40px}.search-panel{max-width:calc(100vw - 24px)}.explore{background:#fffdf7}.phone-title{font-family:Georgia,serif}.bottom-nav{border-color:#d8dfd2}.sheet-minimized h1{font-size:17px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+/* ArrowBrooke's fall sale: paper, terracotta, ochre and sage. */
+:root{--blue:#a65332;--green:#71805a;--shadow:0 10px 36px #6d42221a}
+body,#map{background:#eee3cf}.explore,.search-box,.search-results,.detail,dialog,.bottom-nav{background:#fffaf0;border-color:#e4d7c0}
+.explore{background-image:radial-gradient(ellipse at 95% 0,#f3d7ad80,transparent 45%)}
+h1,.detail h2,.dialog-top h2{color:#553d2c}.eyebrow{color:#a65332;letter-spacing:1.2px}.ghost{filter:saturate(.8)}.intro{color:#84715f}
+.chip{background:#fffaf0;border-color:#e1d3bb;color:#705a45}.chip.active,.primary,.add-button{background:#a65332;border-color:#a65332;color:#fffaf0}.chip:hover{border-color:#a65332}
+.connection,.connection.live{background:#f2ebd9;border-color:#e7dbc0;color:#7b6745}.secondary{background:#f1e8d7;border-color:#e0ceb3;color:#8d4b31}.map-button{background:#fffaf0;border-color:#e4d7c0;color:#a65332}
+.stop-row{border-color:#e9dfcc}.stop-title,.list-heading h2,.empty strong{color:#553d2c}.stop-time{color:#a65332}.stop-icon{background:#f3e5ce!important}.stop-address,.stop-badge,.local-note{color:#8a7762}
+.detail .sale-hours{background:#f3e8d3;color:#8d4b31}.tag{background:#eee8d2;color:#746449}.approval-note{background:#f3e8d3;border-color:#e5d5b6;color:#7f664c}
+form input:not([type=checkbox]),textarea{background:#fffdf7;border-color:#e1d4bd}.category-options span{background:#fffaf0;border-color:#e1d4bd;color:#705a45}.category-options input:checked+span{background:#f4e1c5;border-color:#a65332;color:#8d4b31}
+.form-address-options,.form-address-option,.search-result{background:#fffaf0;border-color:#e4d7c0;color:#553d2c}.form-address-option:hover,.form-address-option:focus-visible,.search-result:hover,.search-result:focus-visible{background:#f3e8d3}
+.bottom-nav .nav-active{color:#a65332}.sheet-handle span{background:#c1a686}.organizer-tools,.organizer-edit{background:#f5eddf;border-color:#e1d4bd}.location-icon-option{background:#f5eddf;border-color:#e1d4bd}.location-icon-option[aria-pressed=true]{background:#f4e1c5;border-color:#a65332}
+.season-note{margin:8px 0 18px;color:#997c56;font-size:10px;letter-spacing:.6px}
+@media(max-width:700px){.explore{background-color:#fffaf0}.season-note{display:none}}
