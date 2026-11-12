@@ -1,5 +1,5 @@
 import { displayCategory } from './display-category.js?v=20261028-category-colors';
-import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js';
+import { distanceToHome, findHome, homeKey, homeCenter } from './home-shapes.js?v=20261112-fast-matching';
 import { pickStopName } from './stop-names.js?v=20261028-many-names';
 import { lookupAddress } from './address-lookup.js';
 import { applyAddressCorrections } from './address-corrections.js?v=20261112-open-space';
@@ -572,6 +572,7 @@ let paintedHomeDataKey = '';
 let buildingDataRevision = 0;
 let buildingSnapshotKey = '';
 let buildingSnapshot = [];
+let addressSnapKey = '';
 let matchedHomesKey = '';
 let renderedHomesKey = '';
 let mapViewChanging = false;
@@ -606,6 +607,8 @@ function snapVisibleAddressLabels() {
   if (!streetMap || !addressDataLoaded || map.getZoom() < 16 || !neighborhoodAddressData.features?.length) return;
   const buildings = mapBuildingFeatures();
   if (!buildings.length) return;
+  const snapKey = `${buildingSnapshotKey}|${neighborhoodAddressData.features.length}`;
+  if (addressSnapKey === snapKey) return;
   const bounds = map.getBounds().pad(0.2);
   // A verified house already owns its footprint. Do not move another label onto it.
   const occupiedHomes = new Set();
@@ -648,6 +651,7 @@ function snapVisibleAddressLabels() {
     if (neighborhoodAddresses[index]) Object.assign(neighborhoodAddresses[index], { lat: nextLat, lng: nextLng });
   }
   if (changed) streetMap.getSource('arrowbrooke-addresses')?.setData(neighborhoodAddressData);
+  addressSnapKey = snapKey;
 }
 
 function updateGreenbeltLabels() {

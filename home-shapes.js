@@ -29,18 +29,30 @@ export function homeCenter(geometry){
   return [(Math.min(...ys)+Math.max(...ys))/2,(Math.min(...xs)+Math.max(...xs))/2];
 }
 export function homeKey(geometry){return JSON.stringify(geometry.coordinates);}
-export function findHome(features,lng,lat,maxDistance=18,used=new Set()){
-  let best=null,distance=maxDistance;
+const preparedHomes = new WeakMap();
+function prepareHomes(features){
+  if(preparedHomes.has(features))return preparedHomes.get(features);
+  const homes=[];
   for(const feature of features){
     const source=feature.geometry;
-    // Vector tiles may pack a whole block into one MultiPolygon feature.
-    // Each Polygon component is an individual home, never the entire tile feature.
     const parts=source?.type==='MultiPolygon'?source.coordinates.map(coordinates=>({type:'Polygon',coordinates})):source?.type==='Polygon'?[source]:[];
     for(const geometry of parts){
-      const key=homeKey(geometry);if(used.has(key))continue;
-      const d=distanceToHome(geometry,lng,lat);
-      if(d<=distance){best=geometry;distance=d;if(d===0)return best;}
+      let minLng=Infinity,minLat=Infinity,maxLng=-Infinity,maxLat=-Infinity;
+      for(const ring of geometry.coordinates)for(const [x,y] of ring){minLng=Math.min(minLng,x);maxLng=Math.max(maxLng,x);minLat=Math.min(minLat,y);maxLat=Math.max(maxLat,y);}
+      homes.push({geometry,key:homeKey(geometry),minLng,minLat,maxLng,maxLat});
     }
+  }
+  preparedHomes.set(features,homes);
+  return homes;
+}
+export function findHome(features,lng,lat,maxDistance=18,used=new Set()){
+  let best=null,distance=maxDistance;
+  const latMargin=maxDistance/DEG,lngMargin=latMargin/Math.cos(lat*Math.PI/180);
+  for(const home of prepareHomes(features)){
+    // Reject distant houses before calculating polygon edges or checking ownership.
+    if(lng<home.minLng-lngMargin||lng>home.maxLng+lngMargin||lat<home.minLat-latMargin||lat>home.maxLat+latMargin||used.has(home.key))continue;
+    const d=distanceToHome(home.geometry,lng,lat);
+    if(d<=distance){best=home.geometry;distance=d;if(d===0)return best;}
   }
   return best;
 }
