@@ -9,7 +9,7 @@ const $ = (selector) => document.querySelector(selector);
 const config = window.YARD_SALE_CONFIG;
 const demo = new URLSearchParams(location.search).get('demo') === '1';
 const categories = {"mens":{"label":"Men's Clothes","icon":"👔","color":"#856b53"},"womens":{"label":"Women's Clothes","icon":"👗","color":"#ac7181"},"kids":{"label":"Kids' Clothes","icon":"👕","color":"#c49344"},"toys":{"label":"Toys","icon":"🧸","color":"#cc913d"},"electronics":{"label":"Electronics","icon":"🔌","color":"#587b85"},"household":{"label":"Home Goods","icon":"🏠","color":"#788558"},"furniture":{"label":"Furniture","icon":"🪑","color":"#a86441"},"tools":{"label":"Tools & Outdoors","icon":"🛠️","color":"#65775f"},"books":{"label":"Books & Games","icon":"📚","color":"#8b729b"},"other":{"label":"Other","icon":"🏷️","color":"#a57d47"}};
-const displayCategories = {...categories, mixed:{label:'Variety sale',icon:'🛍️',color:'#377e68'}};
+const displayCategories = Object.fromEntries([...Object.entries(categories),['mixed',{label:'Variety sale',icon:'🛍️'}]].map(([key,item])=>[key,{...item,color:'#a65332'}]));
 const paymentMethods={cash:'Cash',venmo:'Venmo',zelle:'Zelle',cashapp:'Cash App',paypal:'PayPal',card:'Cards',other:'Other'};
 function paymentDescription(stop){return (stop.payment_methods||[]).map(key=>key==='other'&&stop.payment_other?stop.payment_other:paymentMethods[key]).filter(Boolean).join(' · ');}
 function paymentFields(stop={}){
