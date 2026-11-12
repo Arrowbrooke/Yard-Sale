@@ -992,7 +992,8 @@ function render() {
   $('#stop-list').innerHTML = visible.length ? visible.map((stop) => {
     const category = displayCategory(stop);
     const categoryInfo = displayCategories[category];
-    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.title)}</span><span class="stop-address">${escapeHtml(stop.address)}</span><span class="stop-time">${escapeHtml(saleHours(stop))}</span><span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span>${paymentDescription(stop)?`<span class="stop-payments">${escapeHtml(paymentDescription(stop))}</span>`:''}</span></button>`;
+    const description=stop.title!==stop.address&&stop.title!==`Yard sale at ${stop.address}`?stop.title:stop.notes;
+    return `<button class="stop-row" data-stop="${escapeHtml(stop.id)}"><span class="stop-icon ${category}">${categoryInfo.icon}</span><span class="stop-text"><span class="stop-title">${escapeHtml(stop.address)}</span>${description?`<span class="stop-address">${escapeHtml(description)}</span>`:''}<span class="stop-time">${escapeHtml(saleHours(stop))}</span><span class="stop-badge">${stop.categories.map((key) => categories[key].label).join(' · ')}</span>${paymentDescription(stop)?`<span class="stop-payments">${escapeHtml(paymentDescription(stop))}</span>`:''}</span></button>`;
   }).join('') : `<div class="empty"><span class="empty-icon">🏷️</span><strong>${stops.length ? 'No matching stops' : 'Be the first on the block'}</strong>${stops.length ? 'Try another filter or search.' : 'Add your house to the neighborhood Yard Sale map.'}</div>`;
   $('#stop-list').querySelectorAll('[data-stop]').forEach((button) => { button.onclick = () => showDetail(button.dataset.stop); });
   if (selectedId && !visible.some((stop) => stop.id === selectedId)) closeDetail();
